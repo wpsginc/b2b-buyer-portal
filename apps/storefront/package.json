@@ -6,7 +6,8 @@
   "prettier": "@bigcommerce/eslint-config/prettier",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --mode production",
+    "build:production": "tsc && vite build --mode production",
     "build:staging": "tsc && vite build --mode staging",
     "lint": "eslint . --ext .ts,.tsx,.js --cache --cache-location ./node_modules/.cache/eslint --max-warnings 0 .",
     "format": "yarn lint --fix",

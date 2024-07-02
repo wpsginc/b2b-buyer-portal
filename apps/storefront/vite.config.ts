@@ -84,6 +84,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       minify: true,
+      outDir: mode === 'production' ? 'dist/production' : 'dist/staging',
       rollupOptions: {
         input: {
           index: 'src/main.ts',
@@ -92,8 +93,9 @@ export default defineConfig(({ mode }) => {
         output: {
           entryFileNames(info) {
             const { name } = info;
-            return name.includes('headless') ? '[name].js' : '[name].[hash].js';
+            return name.includes('headless') ? '[name].js' : '[name].js';
           },
+          chunkFileNames: 'assets/[name].js',
         },
         onwarn(warning, warn) {
           if (warning.code === 'MODULE_LEVEL_DIRECTIVE') {
