@@ -1,16 +1,18 @@
 import Cookies from 'js-cookie';
 
 import { store } from '@/store';
-import { baseUrl, channelId, snackbar, storeHash } from '@/utils';
+import { channelId, snackbar, storeHash } from '@/utils';
 
-import { B2B_BASIC_URL, queryParse, RequestType, RequestTypeKeys } from './base';
+import { B2B_BASIC_URL, NS_BACKEND, NS_SCRIPT_ID, NS_DEPLOY_ID, NS_TOKEN, queryParse, RequestType, RequestTypeKeys } from './base'
 import b3Fetch from './fetch';
+import nsFetch from './custom';
 
 const GraphqlEndpointsFn = (type: RequestTypeKeys): string => {
   const GraphqlEndpoints: CustomFieldStringItems = {
     B2BGraphql: `${B2B_BASIC_URL}/graphql`,
-    BCGraphql: `${baseUrl}/graphql`,
+    BCGraphql: `https://witmer-public-safety-group-sandbox.mybigcommerce.com/graphql`,  //`${baseUrl}/graphql`,
     BCProxyGraphql: `${B2B_BASIC_URL}/api/v3/proxy/bc-storefront/graphql`,
+    NSBackend: NS_BACKEND,
   };
 
   return GraphqlEndpoints[type] || '';
@@ -58,6 +60,45 @@ function graphqlRequest<T, Y>(type: RequestTypeKeys, data: T, config?: Y) {
   return b3Fetch(url, init);
 }
 
+function nsRequest<Y>(
+  type: RequestTypeKeys,
+  data: any,
+  config?: Y
+) {
+
+  const { order_id, customer_id, return_reason, line_items } = data[0]
+  const orderID = order_id;
+  const customerID = customer_id;
+  const returnReason = return_reason;
+  const lineItems = line_items;
+
+  const data_json = {
+    "script": NS_SCRIPT_ID,
+    "deploy": NS_DEPLOY_ID,
+    "custId": customerID ? customerID : 0,
+    "orderID": orderID ? orderID : 0,
+    "order": order_id ? order_id : 0,
+    "returnReason": returnReason ? returnReason : "",
+    "lines": lineItems && lineItems.length > 0 ? lineItems : []
+  }
+
+  const init = {
+    method: 'POST',
+    headers: {
+      ...config,
+    },
+    body: JSON.stringify(data_json),
+  }
+
+  let url = GraphqlEndpointsFn(type)
+
+  if(line_items.length < 1 && order_id === 0) url = `${url}/get-orders`
+  if(line_items.length < 1 && order_id > 0) url = `${url}/get-order`
+  if(line_items && line_items.length > 0 && return_reason) url = `${url}/create-return`
+
+  return nsFetch(url, init)
+}
+
 interface B2bGQLResponse {
   data: any;
   errors?: Array<{
@@ -69,6 +110,16 @@ interface B2bGQLResponse {
 }
 
 const B3Request = {
+
+  nsBackend: function post(data: any): Promise<any> {
+    const config = {
+      Authorization: `Bearer ${NS_TOKEN}`,
+      'content-type': 'application/json',
+      'accept': 'application/json',
+    }
+    return nsRequest(RequestType.NSBackend, data, config)
+  },
+  
   /**
    * Request to B2B graphql API using B2B token
    */

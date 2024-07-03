@@ -1,5 +1,5 @@
 interface OrderStatusConfig {
-  [k: string]: string;
+  [k: string]: string
 }
 export const orderStatusCode: OrderStatusConfig = {
   0: 'Incomplete',
@@ -17,7 +17,16 @@ export const orderStatusCode: OrderStatusConfig = {
   12: 'Manual Verification Required',
   13: 'Disputed',
   14: 'Partially Refunded',
-};
+  15: 'pendingBilling',
+  16: 'pendingFulfillment',
+  17: 'fullyBilled',
+  18: 'pendingApproval',
+  19: 'partiallyFulfilled',
+  20: 'Fulfilled',
+  21: 'Billed',
+  22: 'closed',
+  23: 'cancelled'
+}
 
 const orderStatusColor: OrderStatusConfig = {
   'Partially Refunded': '#F4CC46',
@@ -35,7 +44,16 @@ const orderStatusColor: OrderStatusConfig = {
   'Awaiting Payment': '#F19536',
   Pending: '#899193',
   Incomplete: '#000000',
-};
+  pendingBilling: '#899193',
+  pendingFulfillment: '#87CBF6',
+  fullyBilled: '#F19536',
+  pendingApproval: '#899193',
+  partiallyFulfilled: '#516FAE',
+  Fulfilled: '#C4DD6C',
+  Billed: '#C4DD6C',
+  closed: '#000000',
+  cancelled: '#000000'
+}
 
 const orderStatusTextColor: OrderStatusConfig = {
   'Partially Refunded': 'rgba(0, 0, 0, 0.87)',
@@ -53,7 +71,16 @@ const orderStatusTextColor: OrderStatusConfig = {
   'Awaiting Payment': '#FFFFFF',
   Pending: '#FFFFFF',
   Incomplete: '#FFFFFF',
-};
+  pendingBilling: '#FFFFFF',
+  pendingFulfillment: 'rgba(0, 0, 0, 0.87)',
+  fullyBilled: '#FFFFFF',
+  pendingApproval: '#FFFFFF',
+  partiallyFulfilled: '#FFFFFF',
+  Fulfilled: '#FFFFFF',
+  Billed: '#FFFFFF',
+  closed: '#FFFFFF',
+  cancelled: '#FFFFFF'
+}
 
 // i18n
 const orderStatusText: OrderStatusConfig = {
@@ -72,7 +99,16 @@ const orderStatusText: OrderStatusConfig = {
   'Awaiting Payment': 'Awaiting Payment',
   Pending: 'Pending',
   Incomplete: 'Incomplete',
-};
+  pendingBilling: 'Pending Billing',
+  pendingFulfillment: 'Pending Fulfillment',
+  fullyBilled: 'Fully Billed',
+  pendingApproval: 'Pending Approval',
+  partiallyFulfilled: 'Partially Fulfilled',
+  Fulfilled: 'Fulfilled',
+  Billed: 'Billed',
+  closed: 'Closed',
+  cancelled: 'Cancelled'
+}
 
 export const orderStatusTranslationVariables: OrderStatusConfig = {
   Incomplete: 'orders.status.incomplete',
@@ -90,18 +126,27 @@ export const orderStatusTranslationVariables: OrderStatusConfig = {
   'Manual Verification Required': 'orders.status.manualVerificationRequired',
   Disputed: 'orders.status.disputed',
   'Partially Refunded': 'orders.status.partiallyRefunded',
-};
+  pendingBilling: 'ns-orders.status.pendingBilling',
+  pendingFulfillment: 'ns-orders.status.pendingFulfillment',
+  fullyBilled: 'ns-orders.status.fullyBilled',
+  pendingApproval: 'ns-bcorders.pendingApproval',
+  partiallyFulfilled: 'ns-orders.status.partiallyFulfilled',
+  Fulfilled: 'ns-orders.status.fulfilled',
+  Billed: 'ns-orders.status.billed',
+  closed: 'ns-orders.status.closed',
+  cancelled: 'orders.status.cancelled',
+}
 
 export const getOrderStatusOptions = () =>
   Object.keys(orderStatusText).map((code) => ({
     value: code,
     label: orderStatusText[code],
-  }));
+  }))
 
 const getOrderStatus = (code: string | number) => ({
   color: orderStatusColor[code],
   textColor: orderStatusTextColor[code],
   name: orderStatusText[code],
-});
+})
 
-export default getOrderStatus;
+export default getOrderStatus

@@ -71,6 +71,21 @@ export interface EditableProductItem extends OrderProductItem {
   helperText?: string;
 }
 
+export interface EditableQty extends OrderItemList {
+  editQuantity: number | string
+  helperText?: string
+}
+
+export interface OrderItemList{
+  lineKey: number
+  itemInternalID: number
+  sku: string | string
+  descr: string
+  quantity: number
+  returnableQuantity: number
+  fulfilled: number
+}
+
 export interface OrderShipmentProductItem {
   order_product_id: number;
   product_id: number;

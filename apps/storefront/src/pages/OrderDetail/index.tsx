@@ -33,6 +33,9 @@ import {
   OrderShipping,
 } from './components';
 
+import { getNSReturnDetails } from '@/shared/service/b2b/graphql/orders'
+import NSOrderItems from './components/netsuite/OrderItems'
+
 const convertBCOrderDetails = convertB2BOrderDetails;
 
 interface LocationState {
@@ -74,63 +77,125 @@ function OrderDetail() {
   const [orderId, setOrderId] = useState('');
   const [isRequestLoading, setIsRequestLoading] = useState(false);
 
+  const [isNsOrder, setisNsOrder] = useState(false)
+  const customerId = useAppSelector(({ company }) => company.customer.id)
+  const [nsStatus , setNsStatus] = useState('');
+  const [nsItemDetails, setNSItemDetails] = useState([])
+
   useEffect(() => {
     setOrderId(params.id || '');
   }, [params]);
 
   const goToOrders = () => {
     navigate(
-      `${(localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders'}`,
+      `${(localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders'}`, {
+        state: {
+          isNetsuiteOrder: isNsOrder ? 1 : 0
+        }
+      }
     );
   };
 
   useEffect(() => {
+
+    let paramId;
+
+    if(params?.id?.includes('ns-')){
+      paramId = params?.id?.split("-")[1];
+      setisNsOrder(true)
+
+    } else {
+      paramId = params.id || ''
+    }
+
+    setOrderId(paramId)
+  }, [params])
+
+  useEffect(() => {
     if (orderId) {
-      const getOrderDetails = async () => {
-        const id = parseInt(orderId, 10);
-        if (!id) {
-          return;
+
+      if(isNsOrder) {
+        const getReturnDetails = async () => {
+          const id = parseInt(orderId, 10)
+            if (!id) return
+
+            setIsRequestLoading(true)
+
+            try {
+
+              const data = [{
+                order_id: parseInt(orderId),
+                customer_id: customerId,
+                return_reason: [],
+                line_items: []
+              }]
+
+              const req = getNSReturnDetails(data);
+              const nsDetails = await req
+              const orderStat = nsDetails?.status
+
+              setNsStatus(orderStat)
+              setNSItemDetails(nsDetails)
+
+            } catch (err) {
+              if (err === 'order does not exist') {
+                setTimeout(() => {
+                  window.location.hash = `/orderDetail/${preOrderId}`
+                }, 1000)
+              }
+            } finally {
+              setIsRequestLoading(false)
+            }
         }
 
-        setIsRequestLoading(true);
-
-        try {
-          const order = isB2BUser ? await getB2BOrderDetails(id) : await getBCOrderDetails(id);
-
-          if (order) {
-            const data = isB2BUser
-              ? convertB2BOrderDetails(order, b3Lang)
-              : convertBCOrderDetails(order, b3Lang);
-            dispatch({
-              type: 'all',
-              payload: data,
-            });
-            setPreOrderId(orderId);
+        getReturnDetails()
+      } else { 
+        const getOrderDetails = async () => {
+          const id = parseInt(orderId, 10);
+          if (!id) {
+            return;
           }
-        } catch (err) {
-          if (err === 'order does not exist') {
-            setTimeout(() => {
-              window.location.hash = `/orderDetail/${preOrderId}`;
-            }, 1000);
+
+          setIsRequestLoading(true);
+
+          try {
+            const order = isB2BUser ? await getB2BOrderDetails(id) : await getBCOrderDetails(id);
+
+            if (order) {
+              const data = isB2BUser
+                ? convertB2BOrderDetails(order, b3Lang)
+                : convertBCOrderDetails(order, b3Lang);
+              dispatch({
+                type: 'all',
+                payload: data,
+              });
+              setPreOrderId(orderId);
+            }
+          } catch (err) {
+            if (err === 'order does not exist') {
+              setTimeout(() => {
+                window.location.hash = `/orderDetail/${preOrderId}`;
+              }, 1000);
+            }
+          } finally {
+            setIsRequestLoading(false);
           }
-        } finally {
-          setIsRequestLoading(false);
-        }
-      };
+        };
 
-      const getOrderStatus = async () => {
-        const orderStatus = isB2BUser ? await getOrderStatusType() : await getBcOrderStatusType();
+        const getOrderStatus = async () => {
+          const orderStatus = isB2BUser ? await getOrderStatusType() : await getBcOrderStatusType();
 
-        dispatch({
-          type: 'statusType',
-          payload: {
-            orderStatus,
-          },
-        });
-      };
+          dispatch({
+            type: 'statusType',
+            payload: {
+              orderStatus,
+            },
+          });
+        };
 
-      getOrderDetails();
-      getOrderStatus();
+        getOrderDetails();
+        getOrderStatus();
+      }
     }
     // Disabling rule since dispatch does not need to be in the dep array and b3Lang has rendering errors
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -251,7 +316,7 @@ function OrderDetail() {
                 purchaseOrderNumber: poNumber ?? '',
               })}
             </Typography>
-            <OrderStatus code={status} text={getOrderStatusLabel(status)} />
+            <OrderStatus code={isNsOrder ? nsStatus : status} text={getOrderStatusLabel(isNsOrder ? nsStatus : status)}/>
           </Grid>
           <Grid
             container
@@ -271,8 +336,8 @@ function OrderDetail() {
             )}
           </Grid>
         </Grid>
-
-        <Grid
+        {isNsOrder ? 
+          <Grid
           container
           spacing={2}
           sx={{
@@ -281,45 +346,75 @@ function OrderDetail() {
             flexWrap: isMobile ? 'wrap' : 'nowrap',
             paddingBottom: '20px',
           }}
-        >
-          <Grid
-            item
-            sx={
-              isMobile
-                ? {
-                    flexBasis: '100%',
-                  }
-                : {
-                    flexBasis: '690px',
-                    flexGrow: 1,
-                  }
-            }
           >
-            <Stack spacing={3}>
-              <OrderShipping />
-              {/* Digital Order Display */}
-              <OrderBilling />
+            <Grid
+              item
+              sx={
+                isMobile
+                  ? {
+                      flexBasis: '100%',
+                    }
+                  : {
+                      flexBasis: '690px',
+                      flexGrow: 1,
+                    }
+              }
+            >
+              <Stack spacing={3}>
+                <NSOrderItems nsItemDetails={nsItemDetails}/>
+              </Stack>
+            </Grid>
+          </Grid>
+        :
+          <Grid
+            container
+            spacing={2}
+            sx={{
+              marginTop: '0',
+              overflow: 'auto',
+              flexWrap: isMobile ? 'wrap' : 'nowrap',
+              paddingBottom: '20px',
+            }}
+          >
+            <Grid
+              item
+              sx={
+                isMobile
+                  ? {
+                      flexBasis: '100%',
+                    }
+                  : {
+                      flexBasis: '690px',
+                      flexGrow: 1,
+                    }
+              }
+            >
+              <Stack spacing={3}>
+                <OrderShipping />
+                {/* Digital Order Display */}
+                <OrderBilling />
 
-              <OrderHistory />
-            </Stack>
+                <OrderHistory />
+              </Stack>
+            </Grid>
+            <Grid
+              item
+              sx={
+                isMobile
+                  ? {
+                      flexBasis: '100%',
+                    }
+                  : {
+                      flexBasis: '340px',
+                    }
+              }
+            >
+              {JSON.stringify(orderSummary) === '{}' ? null : (
+                <OrderAction detailsData={detailsData} />
+              )}
+            </Grid>
           </Grid>
-          <Grid
-            item
-            sx={
-              isMobile
-                ? {
-                    flexBasis: '100%',
-                  }
-                : {
-                    flexBasis: '340px',
-                  }
-            }
-          >
-            {JSON.stringify(orderSummary) === '{}' ? null : (
-              <OrderAction detailsData={detailsData} />
-            )}
-          </Grid>
-        </Grid>
+        }
       </Box>
     </B3Spin>
   );
