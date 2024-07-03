@@ -1,16 +1,17 @@
-import { Fragment, useState } from 'react'
-import { useB3Lang } from '@b3/lang'
-import styled from '@emotion/styled'
-import { Box } from '@mui/material'
-import throttle from 'lodash-es/throttle'
-import CustomButton from '@/components/button/CustomButton'
-import {useAppSelector } from '@/store'
-import {snackbar} from '@/utils'
-import OrderDialog from './OrderDialog'
+import { Fragment, useState } from 'react';
+import { useB3Lang } from '@b3/lang';
+import styled from '@emotion/styled';
+import { Box } from '@mui/material';
+import throttle from 'lodash-es/throttle';
 
+import CustomButton from '@/components/button/CustomButton';
+import { useAppSelector } from '@/store';
+import { snackbar } from '@/utils';
+
+import OrderDialog from './OrderDialog';
 
 interface StyledCardActionsProps {
-  isShowButtons: boolean
+  isShowButtons: boolean;
 }
 
 const StyledCardActions = styled('div')<StyledCardActionsProps>((props) => ({
@@ -22,27 +23,27 @@ const StyledCardActions = styled('div')<StyledCardActionsProps>((props) => ({
     marginRight: '8px',
     margin: '8px 8px 0 0',
   },
-}))
+}));
 
 interface Buttons {
-  value: string
-  key: string
-  name: string
-  variant?: 'text' | 'contained' | 'outlined'
-  isCanShow: boolean
+  value: string;
+  key: string;
+  name: string;
+  variant?: 'text' | 'contained' | 'outlined';
+  isCanShow: boolean;
 }
 
 interface DialogData {
-  dialogTitle: string
-  type: string
-  description: string
-  confirmText: string
+  dialogTitle: string;
+  type: string;
+  description: string;
+  confirmText: string;
 }
 
 export default function OrderAction(nsItemDetails: any) {
-  const role = useAppSelector(({ company }) => company.customer.role)
+  const role = useAppSelector(({ company }) => company.customer.role);
 
-  const b3Lang = useB3Lang()
+  const b3Lang = useB3Lang();
 
   const buttons: Buttons[] = [
     {
@@ -51,12 +52,10 @@ export default function OrderAction(nsItemDetails: any) {
       name: 'return',
       variant: 'outlined',
       isCanShow: true,
-    }
-  ]
+    },
+  ];
 
-  const isAgenting = useAppSelector(
-    ({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting
-  )
+  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
 
   const dialogData = [
     {
@@ -64,38 +63,33 @@ export default function OrderAction(nsItemDetails: any) {
       type: 'return',
       description: b3Lang('orderDetail.orderCard.returnDescription'),
       confirmText: b3Lang('orderDetail.orderCard.returnConfirmText'),
-    }
-  ]
+    },
+  ];
 
-  const [open, setOpen] = useState<boolean>(false)
-  const [type, setType] = useState<string>('')
-  const [currentDialogData, setCurrentDialogData] = useState<DialogData>()
-  const isShowButtons = buttons.filter((btn) => btn.isCanShow).length > 0
-  const {
-    nsOrderInternalID,
-    lines
-  } = nsItemDetails.itemDetails
+  const [open, setOpen] = useState<boolean>(false);
+  const [type, setType] = useState<string>('');
+  const [currentDialogData, setCurrentDialogData] = useState<DialogData>();
+  const isShowButtons = buttons.filter((btn) => btn.isCanShow).length > 0;
+  const { itemDetails } = nsItemDetails;
+  const { nsOrderInternalID, lines } = itemDetails;
 
   if (!nsOrderInternalID) {
-    return null
+    return null;
   }
 
   const handleOpenDialog = (name: string) => {
-
     if (!isAgenting && +role === 3) {
-      snackbar.error(b3Lang('orderDetail.orderCard.errorMasquerade'))
-      return
+      snackbar.error(b3Lang('orderDetail.orderCard.errorMasquerade'));
+      return;
     }
 
-    setOpen(true)
-    setType(name)
+    setOpen(true);
+    setType(name);
 
-    const newDialogData = dialogData.find(
-      (data: DialogData) => data.type === name
-    )
+    const newDialogData = dialogData.find((data: DialogData) => data.type === name);
 
-    setCurrentDialogData(newDialogData)
-}
+    setCurrentDialogData(newDialogData);
+  };
 
   return (
     <Box
@@ -107,8 +101,7 @@ export default function OrderAction(nsItemDetails: any) {
         sx={{
           padding: '0rem 1rem 0 1rem',
         }}
-      >
-      </Box>
+      />
       <StyledCardActions isShowButtons={isShowButtons}>
         {buttons &&
           buttons.map((button: Buttons) => (
@@ -120,7 +113,7 @@ export default function OrderAction(nsItemDetails: any) {
                   name={button.name}
                   variant={button.variant}
                   onClick={throttle(() => {
-                    handleOpenDialog(button.name)
+                    handleOpenDialog(button.name);
                   }, 2000)}
                 >
                   {button.value}
@@ -139,5 +132,5 @@ export default function OrderAction(nsItemDetails: any) {
         orderId={nsOrderInternalID}
       />
     </Box>
-  )
+  );
 }

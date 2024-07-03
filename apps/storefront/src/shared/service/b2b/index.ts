@@ -36,12 +36,12 @@ import {
   superAdminEndMasquerade,
 } from './graphql/global';
 import {
-  getNSOrders,
   getB2BAllOrders,
   getB2BOrderDetails,
   getBCAllOrders,
   getBCOrderDetails,
   getBcOrderStatusType,
+  getNSOrders,
   getOrdersCreatedByUser,
   getOrderStatusType,
 } from './graphql/orders';

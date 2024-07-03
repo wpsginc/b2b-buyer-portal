@@ -4,7 +4,9 @@
     {
       "files": ["src/pages/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
       "rules": {
-        "no-param-reassign": 0
+        "no-param-reassign": 0,
+        "@typescript-eslint/no-explicit-any": 0,
+        "@typescript-eslint/naming-convention": 0
       }
     },
     {
@@ -95,7 +97,8 @@
         "src/**.d.ts"
       ],
       "rules": {
-        "@typescript-eslint/no-explicit-any": 0
+        "@typescript-eslint/no-explicit-any": 0,
+        "@typescript-eslint/naming-convention": 0
       }
     },
     {

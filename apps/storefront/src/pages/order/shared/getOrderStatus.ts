@@ -1,5 +1,5 @@
 interface OrderStatusConfig {
-  [k: string]: string
+  [k: string]: string;
 }
 export const orderStatusCode: OrderStatusConfig = {
   0: 'Incomplete',
@@ -25,8 +25,8 @@ export const orderStatusCode: OrderStatusConfig = {
   20: 'Fulfilled',
   21: 'Billed',
   22: 'closed',
-  23: 'cancelled'
-}
+  23: 'cancelled',
+};
 
 const orderStatusColor: OrderStatusConfig = {
   'Partially Refunded': '#F4CC46',
@@ -52,8 +52,8 @@ const orderStatusColor: OrderStatusConfig = {
   Fulfilled: '#C4DD6C',
   Billed: '#C4DD6C',
   closed: '#000000',
-  cancelled: '#000000'
-}
+  cancelled: '#000000',
+};
 
 const orderStatusTextColor: OrderStatusConfig = {
   'Partially Refunded': 'rgba(0, 0, 0, 0.87)',
@@ -79,8 +79,8 @@ const orderStatusTextColor: OrderStatusConfig = {
   Fulfilled: '#FFFFFF',
   Billed: '#FFFFFF',
   closed: '#FFFFFF',
-  cancelled: '#FFFFFF'
-}
+  cancelled: '#FFFFFF',
+};
 
 // i18n
 const orderStatusText: OrderStatusConfig = {
@@ -107,8 +107,8 @@ const orderStatusText: OrderStatusConfig = {
   Fulfilled: 'Fulfilled',
   Billed: 'Billed',
   closed: 'Closed',
-  cancelled: 'Cancelled'
-}
+  cancelled: 'Cancelled',
+};
 
 export const orderStatusTranslationVariables: OrderStatusConfig = {
   Incomplete: 'orders.status.incomplete',
@@ -135,18 +135,18 @@ export const orderStatusTranslationVariables: OrderStatusConfig = {
   Billed: 'ns-orders.status.billed',
   closed: 'ns-orders.status.closed',
   cancelled: 'orders.status.cancelled',
-}
+};
 
 export const getOrderStatusOptions = () =>
   Object.keys(orderStatusText).map((code) => ({
     value: code,
     label: orderStatusText[code],
-  }))
+  }));
 
 const getOrderStatus = (code: string | number) => ({
   color: orderStatusColor[code],
   textColor: orderStatusTextColor[code],
   name: orderStatusText[code],
-})
+});
 
-export default getOrderStatus
+export default getOrderStatus;

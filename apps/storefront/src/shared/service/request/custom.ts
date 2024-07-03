@@ -1,33 +1,30 @@
-const originFetch = window.fetch
+const originFetch = window.fetch;
 
 const responseResult = (path: string, res: any, resolve: any, init: any) => {
-  if (path.includes('current.jwt')) return res.text()
+  if (path.includes('current.jwt')) return res.text();
 
   if (init.method === 'DELETE') {
-    resolve()
+    resolve();
   }
-  return res.json()
-}
+  return res.json();
+};
 
-function nsFetch(
-  path: string,
-  init: any
-) {
+function nsFetch(path: string, init: any) {
   return new Promise((resolve, reject) => {
     originFetch(path, init)
       .then((res: Response) => responseResult(path, res, resolve, init))
       .then(async (res) => {
         if (res?.code === 500) {
-          const data = res?.data || {}
-          const message = data.errMsg || res.message || ''
-          reject(message)
-          return
+          const data = res?.data || {};
+          const message = data.errMsg || res.message || '';
+          reject(message);
+          return;
         }
-        resolve(res?.data)
+        resolve(res?.data);
       })
       .catch((err: Error) => {
-        reject(err)
-      })
-  })
+        reject(err);
+      });
+  });
 }
-export default nsFetch
+export default nsFetch;

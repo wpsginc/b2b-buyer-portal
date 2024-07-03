@@ -16,6 +16,7 @@ import {
   getBcOrderStatusType,
   getOrderStatusType,
 } from '@/shared/service/b2b';
+import { getNSReturnDetails } from '@/shared/service/b2b/graphql/orders';
 import { isB2BUserSelector, useAppSelector } from '@/store';
 import b2bLogger from '@/utils/b3Logger';
 
@@ -23,6 +24,7 @@ import { AddressConfigItem, OrderStatusItem } from '../../types';
 import OrderStatus from '../order/components/OrderStatus';
 import { orderStatusTranslationVariables } from '../order/shared/getOrderStatus';
 
+import NSOrderItems from './components/netsuite/OrderItems';
 import { OrderDetailsContext, OrderDetailsProvider } from './context/OrderDetailsContext';
 import convertB2BOrderDetails from './shared/B2BOrderData';
 import {
@@ -32,9 +34,6 @@ import {
   OrderHistory,
   OrderShipping,
 } from './components';
-
-import { getNSReturnDetails } from '@/shared/service/b2b/graphql/orders'
-import NSOrderItems from './components/netsuite/OrderItems'
 
 const convertBCOrderDetails = convertB2BOrderDetails;
 
@@ -77,10 +76,10 @@ function OrderDetail() {
   const [orderId, setOrderId] = useState('');
   const [isRequestLoading, setIsRequestLoading] = useState(false);
 
-  const [isNsOrder, setisNsOrder] = useState(false)
-  const customerId = useAppSelector(({ company }) => company.customer.id)
-  const [nsStatus , setNsStatus] = useState('');
-  const [nsItemDetails, setNSItemDetails] = useState([])
+  const [isNsOrder, setisNsOrder] = useState(false);
+  const customerId = useAppSelector(({ company }) => company.customer.id);
+  const [nsStatus, setNsStatus] = useState('');
+  const [nsItemDetails, setNSItemDetails] = useState([]);
 
   useEffect(() => {
     setOrderId(params.id || '');
@@ -88,68 +87,66 @@ function OrderDetail() {
 
   const goToOrders = () => {
     navigate(
-      `${(localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders'}`, {
+      `${(localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders'}`,
+      {
         state: {
-          isNetsuiteOrder: isNsOrder ? 1 : 0
-        }
-      }
+          isNetsuiteOrder: isNsOrder ? 1 : 0,
+        },
+      },
     );
   };
 
   useEffect(() => {
-
     let paramId;
 
-    if(params?.id?.includes('ns-')){
-      paramId = params?.id?.split("-")[1];
-      setisNsOrder(true)
-
+    if (params?.id?.includes('ns-')) {
+      paramId = params?.id?.split('-')[1];
+      setisNsOrder(true);
     } else {
-      paramId = params.id || ''
+      paramId = params.id || '';
     }
 
-    setOrderId(paramId)
-  }, [params])
+    setOrderId(paramId);
+  }, [params]);
 
   useEffect(() => {
     if (orderId) {
-
-      if(isNsOrder) {
+      if (isNsOrder) {
         const getReturnDetails = async () => {
-          const id = parseInt(orderId, 10)
-            if (!id) return
+          const id = parseInt(orderId, 10);
+          if (!id) return;
 
-            setIsRequestLoading(true)
+          setIsRequestLoading(true);
 
-            try {
-
-              const data = [{
-                order_id: parseInt(orderId),
+          try {
+            const data = [
+              {
+                order_id: parseInt(orderId, 10),
                 customer_id: customerId,
                 return_reason: [],
-                line_items: []
-              }]
+                line_items: [],
+              },
+            ];
 
-              const req = getNSReturnDetails(data);
-              const nsDetails = await req
-              const orderStat = nsDetails?.status
+            const req = getNSReturnDetails(data);
+            const nsDetails = await req;
+            const orderStat = nsDetails?.status;
 
-              setNsStatus(orderStat)
-              setNSItemDetails(nsDetails)
-
-            } catch (err) {
-              if (err === 'order does not exist') {
-                setTimeout(() => {
-                  window.location.hash = `/orderDetail/${preOrderId}`
-                }, 1000)
-              }
-            } finally {
-              setIsRequestLoading(false)
+            setNsStatus(orderStat);
+            setNSItemDetails(nsDetails);
+          } catch (err) {
+            if (err === 'order does not exist') {
+              setTimeout(() => {
+                window.location.hash = `/orderDetail/${preOrderId}`;
+              }, 1000);
             }
-        }
+          } finally {
+            setIsRequestLoading(false);
+          }
+        };
 
-        getReturnDetails()
-      } else { 
+        getReturnDetails();
+      } else {
         const getOrderDetails = async () => {
           const id = parseInt(orderId, 10);
           if (!id) {
@@ -316,7 +313,10 @@ function OrderDetail() {
                 purchaseOrderNumber: poNumber ?? '',
               })}
             </Typography>
-            <OrderStatus code={isNsOrder ? nsStatus : status} text={getOrderStatusLabel(isNsOrder ? nsStatus : status)}/>
+            <OrderStatus
+              code={isNsOrder ? nsStatus : status}
+              text={getOrderStatusLabel(isNsOrder ? nsStatus : status)}
+            />
           </Grid>
           <Grid
             container
@@ -336,16 +336,16 @@ function OrderDetail() {
             )}
           </Grid>
         </Grid>
-        {isNsOrder ? 
+        {isNsOrder ? (
           <Grid
-          container
-          spacing={2}
-          sx={{
-            marginTop: '0',
-            overflow: 'auto',
-            flexWrap: isMobile ? 'wrap' : 'nowrap',
-            paddingBottom: '20px',
-          }}
+            container
+            spacing={2}
+            sx={{
+              marginTop: '0',
+              overflow: 'auto',
+              flexWrap: isMobile ? 'wrap' : 'nowrap',
+              paddingBottom: '20px',
+            }}
           >
             <Grid
               item
@@ -361,11 +361,11 @@ function OrderDetail() {
               }
             >
               <Stack spacing={3}>
-                <NSOrderItems nsItemDetails={nsItemDetails}/>
+                <NSOrderItems nsItemDetails={nsItemDetails} />
               </Stack>
             </Grid>
           </Grid>
-        :
+        ) : (
           <Grid
             container
             spacing={2}
@@ -414,7 +414,7 @@ function OrderDetail() {
               )}
             </Grid>
           </Grid>
-        }
+        )}
       </Box>
     </B3Spin>
   );

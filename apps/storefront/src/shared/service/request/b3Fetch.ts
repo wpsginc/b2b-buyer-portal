@@ -123,8 +123,8 @@ const B3Request = {
     return nsRequest(RequestType.NSBackend, data, config);
   },
 
-{
-equest to B2B graphql API using B2B token
+  /** 
+Request to B2B graphql API using B2B token
    */
   graphqlB2B: function post<T>(data: T, customMessage = false): Promise<any> {
     const { B2BToken } = store.getState().company.tokens;

@@ -1,6 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
-import * as React from 'react'
+import { useEffect, useMemo, useState } from 'react';
+import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -9,12 +11,12 @@ import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
-import Paper from '@mui/material/Paper';
-import { getNSOrders } from '@/shared/service/b2b';
+
 import B3Spin from '@/components/spin/B3Spin';
-import OrderStatus from './OrderStatus';
-import { useNavigate } from 'react-router-dom';
+import { getNSOrders } from '@/shared/service/b2b';
 import { useAppSelector } from '@/store';
+
+import OrderStatus from './OrderStatus';
 
 const headCells = [
   {
@@ -46,9 +48,8 @@ const headCells = [
     numeric: false,
     disablePadding: false,
     label: 'CreatedAt',
-  }
+  },
 ];
-
 
 function EnhancedTableHead() {
   return (
@@ -56,9 +57,7 @@ function EnhancedTableHead() {
       <TableRow>
         {headCells.map((headCell) => (
           <TableCell align="center" key={headCell.id}>
-            <TableSortLabel>
-              {headCell.label}
-            </TableSortLabel>
+            <TableSortLabel>{headCell.label}</TableSortLabel>
           </TableCell>
         ))}
       </TableRow>
@@ -66,143 +65,141 @@ function EnhancedTableHead() {
   );
 }
 
-
 export default function NetsuiteOrders() {
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(5);
-    const [allTotal, setAllTotal] = useState(0)
-    const [allOrders, setAllOrders] = useState([])
-    const [isRequestLoading, setIsRequestLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [allTotal, setAllTotal] = useState(0);
+  const [allOrders, setAllOrders] = useState([]);
+  const [isRequestLoading, setIsRequestLoading] = useState(true);
+  const customerId = useAppSelector(({ company }) => company.customer.id);
 
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
-    useEffect(() => {
-
-      const customerId = useAppSelector(({ company }) => company.customer.id)
-
-      const initializeOrders = async () => {
-
-      const data = [{
-        order_id: 0,
-        customer_id: customerId,
-        return_reason: [],
-        line_items: []
-      }]
+  useEffect(() => {
+    const initializeOrders = async () => {
+      const data = [
+        {
+          order_id: 0,
+          customer_id: customerId,
+          return_reason: [],
+          line_items: [],
+        },
+      ];
 
       const fn = await getNSOrders(data);
-      const nsOrders = await fn
+      const nsOrders = await fn;
       const totalCount = nsOrders?.orders.length;
       const orders = nsOrders?.orders;
 
-      setAllOrders(orders)
-      setAllTotal(totalCount)
-      setRowsPerPage(10)
-      setPage(0)
-
-      setIsRequestLoading(false)
-      
-      }
-
-      initializeOrders()
-    }, [])
-
-    const handleClick = (id: number) => {
-      navigate(`/orderDetail/ns-${id}`,{
-        state: {
-          currentIndex: 0,
-          totalCount: allTotal
-        },
-      });
-    };
-
-    const dateFormat = (date: any) => {
-      const itemDate = new Date(date).toLocaleString('default', {month: 'short', day: 'numeric', year: 'numeric'});
-      return itemDate; 
-    } 
-
-    const handleChangePage = (event: unknown, newPage: number) => {
-      console.log(event);
-      setPage(newPage);
-    };
-
-    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-      setRowsPerPage(parseInt(event.target.value, 10));
+      setAllOrders(orders);
+      setAllTotal(totalCount);
+      setRowsPerPage(10);
       setPage(0);
+
+      setIsRequestLoading(false);
     };
 
-    // Avoid a layout jump when reaching the last page with empty rows.
-    const emptyRows =
-      page > 0 ? Math.max(0, (1 + page) * rowsPerPage - allTotal) : 0;
+    initializeOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  const handleClick = (id: number) => {
+    navigate(`/orderDetail/ns-${id}`, {
+      state: {
+        currentIndex: 0,
+        totalCount: allTotal,
+      },
+    });
+  };
 
-    const visibleRows = useMemo(() =>
-        allOrders.slice(
-          page * rowsPerPage,
-          page * rowsPerPage + rowsPerPage,
-        ),
-      [page, rowsPerPage],
-    );
+  const dateFormat = (date: any) => {
+    const itemDate = new Date(date).toLocaleString('default', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    return itemDate;
+  };
 
-    return (
-      <B3Spin isSpinning={isRequestLoading}>
-        <Box
-          sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              flex: 1,
-            }}
-          >
-          <Paper sx={{ width: '100%', mb: 2 }}>
-            <TableContainer>
-              <Table
-                sx={{ minWidth: 750 }}
-                aria-labelledby="tableTitle"
-                size='medium'
-              >
-                <EnhancedTableHead/>
-                <TableBody>
-                  {visibleRows.map((data: any) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
 
-                    return (
-                      <TableRow
-                        hover
-                        onClick={() => handleClick(data.nsOrderInternalID)}
-                        role="checkbox"
-                        tabIndex={-1}
-                        key={data.nsOrderInternalID}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        <TableCell align="center">{data.bcOrderNum ? data.bcOrderNum : "-"}</TableCell>
-                        <TableCell align="center">{data.orderNumber}</TableCell>
-                        <TableCell align="center"><OrderStatus code={data.status} /></TableCell>
-                        <TableCell align="center">{data.returnable === true ? "Yes" : "No"}</TableCell>
-                        <TableCell align="center">{dateFormat(data.date)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {emptyRows > 0 && (
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Avoid a layout jump when reaching the last page with empty rows.
+  const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - allTotal) : 0;
+
+  const visibleRows = useMemo(
+    () => allOrders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [page, rowsPerPage],
+  );
+
+  return (
+    <B3Spin isSpinning={isRequestLoading}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+        }}
+      >
+        <Paper sx={{ width: '100%', mb: 2 }}>
+          <TableContainer>
+            <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle" size="medium">
+              <EnhancedTableHead />
+              <TableBody>
+                {visibleRows.map((data: any) => {
+                  return (
                     <TableRow
-                      style={{
-                        height: 53* emptyRows,
-                      }}
+                      hover
+                      onClick={() => handleClick(data.nsOrderInternalID)}
+                      role="checkbox"
+                      tabIndex={-1}
+                      key={data.nsOrderInternalID}
+                      sx={{ cursor: 'pointer' }}
                     >
-                      <TableCell colSpan={5} />
+                      <TableCell align="center">
+                        {data.bcOrderNum ? data.bcOrderNum : '-'}
+                      </TableCell>
+                      <TableCell align="center">{data.orderNumber}</TableCell>
+                      <TableCell align="center">
+                        <OrderStatus code={data.status} />
+                      </TableCell>
+                      <TableCell align="center">
+                        {data.returnable === true ? 'Yes' : 'No'}
+                      </TableCell>
+                      <TableCell align="center">{dateFormat(data.date)}</TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={allTotal}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </Paper>
-        </Box>
-      </B3Spin>
-    );
+                  );
+                })}
+                {emptyRows > 0 && (
+                  <TableRow
+                    style={{
+                      height: 53 * emptyRows,
+                    }}
+                  >
+                    <TableCell colSpan={5} />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={allTotal}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </Paper>
+      </Box>
+    </B3Spin>
+  );
 }

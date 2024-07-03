@@ -14,7 +14,8 @@
     },
     "build:staging": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "cache": false
     },
     "test": {
       "dependsOn": ["^build"],
