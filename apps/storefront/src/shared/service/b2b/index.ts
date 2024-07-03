@@ -36,6 +36,7 @@ import {
   superAdminEndMasquerade,
 } from './graphql/global';
 import {
+  getNSOrders,
   getB2BAllOrders,
   getB2BOrderDetails,
   getBCAllOrders,
@@ -245,6 +246,7 @@ export {
   validateAddressExtraFields,
   validateBCCompanyExtraFields,
   validateBCCompanyUserExtraFields,
+  getNSOrders,
 };
 
 export { default as getProxyInfo } from './api/proxy';

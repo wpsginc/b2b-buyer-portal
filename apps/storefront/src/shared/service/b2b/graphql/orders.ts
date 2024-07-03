@@ -189,6 +189,16 @@ const getCreatedByUser = (companyId: number, module: number, fn: string) => `{
   }
 }`;
 
+export const getNSOrders = (data: any) =>
+  B3Request.nsBackend(data)
+
+export const getNSReturnDetails = (data: any) =>
+    B3Request.nsBackend(data)
+
+export const createNSReturn = (data: any) =>
+  B3Request.nsBackend(data)
+
+
 export const getB2BAllOrders = (data: CustomFieldItems) =>
   B3Request.graphqlB2B({
     query: allOrders(data, 'allOrders'),

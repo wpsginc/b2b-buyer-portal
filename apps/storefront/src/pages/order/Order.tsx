@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
-import { Box } from '@mui/material';
+import { Box, Tabs, Tab } from '@mui/material';
 
 import B3Filter from '@/components/filter/B3Filter';
 import B3Spin from '@/components/spin/B3Spin';
@@ -29,6 +29,7 @@ import {
   sortKeys,
 } from './config';
 import { OrderItemCard } from './OrderItemCard';
+import NetsuiteOrders from './components/NetsuiteOrders'
 
 interface ListItem {
   firstName: string;
@@ -83,7 +84,13 @@ function Order({ isCompanyOrder = false }: OrderProps) {
     setFilterData,
   );
 
+  const location = useLocation();
+  const [tabValue, setTabValue] = useState(0)
+
   useEffect(() => {
+
+    if(location.state?.isNetsuiteOrder === 1) setTabValue(1)
+
     const search = getInitFilter(isCompanyOrder, isB2BUser);
     setFilterData(search);
     if (role === 100) return;
@@ -146,6 +153,15 @@ function Order({ isCompanyOrder = false }: OrderProps) {
       edges,
       totalCount,
     };
+  };
+
+  useEffect(() => {
+    fetchList
+  }, [tabValue])
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    console.log(event);
+    setTabValue(newValue);
   };
 
   const navigate = useNavigate();
@@ -273,7 +289,6 @@ function Order({ isCompanyOrder = false }: OrderProps) {
   const columnItems = getColumnItems();
 
   return (
-    <B3Spin isSpinning={isRequestLoading}>
       <Box
         sx={{
           display: 'flex',
@@ -281,54 +296,75 @@ function Order({ isCompanyOrder = false }: OrderProps) {
           flex: 1,
         }}
       >
-        <B3Filter
-          // sortByConfig={sortByConfigData}
-          startPicker={{
-            isEnabled: true,
-            label: b3Lang('orders.from'),
-            defaultValue: filterData?.beginDateAt || null,
-            pickerKey: 'start',
-          }}
-          endPicker={{
-            isEnabled: true,
-            label: b3Lang('orders.to'),
-            defaultValue: filterData?.endDateAt || null,
-            pickerKey: 'end',
-          }}
-          fiterMoreInfo={filterInfo}
-          handleChange={handleChange}
-          handleFilterChange={handleFirterChange}
-        />
-        <B3PaginationTable
-          columnItems={columnItems}
-          rowsPerPageOptions={[10, 20, 30]}
-          getRequestList={fetchList}
-          searchParams={filterData || {}}
-          isCustomRender={false}
-          requestLoading={setIsRequestLoading}
-          tableKey="orderId"
-          sortDirection={order}
-          orderBy={orderBy}
-          sortByFn={handleSetOrderBy}
-          renderItem={(row: ListItem, index?: number) => (
-            <OrderItemCard
-              key={row.orderId}
-              item={row}
-              index={index}
-              allTotal={allTotal}
-              filterData={filterData}
-              isCompanyOrder={isCompanyOrder}
-            />
-          )}
-          onClickRow={(item: ListItem, index?: number) => {
-            if (index !== undefined) {
-              goToDetail(item, index);
-            }
-          }}
-          hover
-        />
+
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: '20px'}}>
+          <Tabs value={tabValue} onChange={handleTabChange} aria-label="order tab">
+            <Tab label="BigCommerce"/>
+            <Tab label="Netsuite"/>
+          </Tabs>
+        </Box>
+
+        { tabValue === 0 ? 
+        <B3Spin isSpinning={isRequestLoading}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+            }}
+            >
+              <B3Filter
+                // sortByConfig={sortByConfigData}
+                startPicker={{
+                  isEnabled: true,
+                  label: b3Lang('orders.from'),
+                  defaultValue: filterData?.beginDateAt || null,
+                  pickerKey: 'start',
+                }}
+                endPicker={{
+                  isEnabled: true,
+                  label: b3Lang('orders.to'),
+                  defaultValue: filterData?.endDateAt || null,
+                  pickerKey: 'end',
+                }}
+                fiterMoreInfo={filterInfo}
+                handleChange={handleChange}
+                handleFilterChange={handleFirterChange}
+              />
+              <B3PaginationTable
+                columnItems={columnItems}
+                rowsPerPageOptions={[10, 20, 30]}
+                getRequestList={fetchList}
+                searchParams={filterData || {}}
+                isCustomRender={false}
+                requestLoading={setIsRequestLoading}
+                tableKey="orderId"
+                sortDirection={order}
+                orderBy={orderBy}
+                sortByFn={handleSetOrderBy}
+                renderItem={(row: ListItem, index?: number) => (
+                  <OrderItemCard
+                    key={row.orderId}
+                    item={row}
+                    index={index}
+                    allTotal={allTotal}
+                    filterData={filterData}
+                    isCompanyOrder={isCompanyOrder}
+                  />
+                )}
+                onClickRow={(item: ListItem, index?: number) => {
+                  if (index !== undefined) {
+                    goToDetail(item, index);
+                  }
+                }}
+                hover
+              />
+            </Box>
+        </B3Spin>
+        :
+        <NetsuiteOrders></NetsuiteOrders>
+        }
       </Box>
-    </B3Spin>
   );
 }
 
