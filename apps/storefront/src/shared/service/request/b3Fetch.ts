@@ -116,7 +116,7 @@ interface B2bGQLResponse {
 const B3Request = {
   nsBackend: function post(data: any): Promise<any> {
     const config = {
-      Authorization: `Bearer ${NS_TOKEN}`,
+      Authorization: `${NS_TOKEN}`,
       'content-type': 'application/json',
       accept: 'application/json',
     };
