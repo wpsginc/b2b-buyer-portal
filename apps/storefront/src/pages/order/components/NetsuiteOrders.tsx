@@ -80,7 +80,7 @@ export default function NetsuiteOrders() {
       const data = [
         {
           order_id: 0,
-          customer_id: customerId,
+          customer_id: customerId.toString(),
           return_reason: [],
           line_items: [],
         },

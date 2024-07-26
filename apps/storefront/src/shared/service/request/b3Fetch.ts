@@ -6,8 +6,6 @@ import { baseUrl, channelId, snackbar, storeHash } from '@/utils';
 import {
   B2B_BASIC_URL,
   NS_BACKEND,
-  NS_DEPLOY_ID,
-  NS_SCRIPT_ID,
   NS_TOKEN,
   queryParse,
   RequestType,
@@ -77,13 +75,17 @@ function nsRequest<Y>(type: RequestTypeKeys, data: any, config?: Y) {
   const lineItems = line_items;
 
   const data_json = {
-    script: NS_SCRIPT_ID,
-    deploy: NS_DEPLOY_ID,
-    custId: customerID || 0,
-    orderID: orderID || 0,
-    order: order_id || 0,
+    custId: customerID.toString() || '0',
+    orderID: orderID.toString() || '0',
+    order: order_id.toString() || '0',
     returnReason: returnReason || '',
-    lines: lineItems && lineItems.length > 0 ? lineItems : [],
+    lines:
+      lineItems && lineItems.length > 0
+        ? lineItems.map((line: { lineKey: number; quantityToReturn: number }) => ({
+            lineKey: line.lineKey.toString(),
+            quantityToReturn: line.quantityToReturn,
+          }))
+        : [],
   };
 
   const init = {

@@ -1,15 +1,7 @@
-const {
-  VITE_B2B_URL,
-  VITE_NETSUITE_BACKEND,
-  VITE_NETSUITE_SCRIPT_ID,
-  VITE_NETSUITE_DEPLOY_ID,
-  VITE_NETSUITE_TOKEN,
-} = import.meta.env;
+const { VITE_B2B_URL, VITE_NETSUITE_BACKEND, VITE_NETSUITE_TOKEN } = import.meta.env;
 
 const B2B_BASIC_URL = VITE_B2B_URL;
 const NS_BACKEND = VITE_NETSUITE_BACKEND;
-const NS_SCRIPT_ID = VITE_NETSUITE_SCRIPT_ID;
-const NS_DEPLOY_ID = VITE_NETSUITE_DEPLOY_ID;
 const NS_TOKEN = VITE_NETSUITE_TOKEN;
 
 enum RequestType {
@@ -33,4 +25,4 @@ const queryParse = <T>(query: T): string => {
   return queryText.slice(0, -1);
 };
 
-export { B2B_BASIC_URL, NS_BACKEND, NS_SCRIPT_ID, NS_DEPLOY_ID, NS_TOKEN, queryParse, RequestType };
+export { B2B_BASIC_URL, NS_BACKEND, NS_TOKEN, queryParse, RequestType };
