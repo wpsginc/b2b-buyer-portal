@@ -92,7 +92,7 @@ export default function NetsuiteOrders() {
       const orders = nsOrders?.orders;
 
       setAllOrders(orders);
-      setAllTotal(totalCount ? totalCount : 0);
+      setAllTotal(totalCount || 0);
       setRowsPerPage(10);
       setPage(0);
 
