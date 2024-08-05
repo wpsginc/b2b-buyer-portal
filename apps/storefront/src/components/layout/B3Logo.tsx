@@ -1,9 +1,9 @@
-import { useContext } from 'react';
+// import { useContext } from 'react';
 import { Box, ImageListItem } from '@mui/material';
 
 import { STORE_DEFAULT_LOGO } from '@/constants';
 import { useMobile } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+// import { GlobaledContext } from '@/shared/global';
 
 const { VITE_B2B_TFS_LOGO, VITE_B2B_OS_LOGO, VITE_B2B_EMS_LOGO, VITE_B2B_GD_LOGO } = import.meta
   .env;
@@ -14,10 +14,9 @@ const EMS_LOGO = VITE_B2B_EMS_LOGO;
 const GD_LOGO = VITE_B2B_GD_LOGO;
 
 export default function B3Logo() {
-  const {
-    // eslint-disable-next-line no-empty-pattern
-    state: {},
-  } = useContext(GlobaledContext);
+  // const {
+  //   state: {},
+  // } = useContext(GlobaledContext);
 
   const [isMobile] = useMobile();
 
