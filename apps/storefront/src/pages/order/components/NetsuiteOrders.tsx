@@ -88,11 +88,11 @@ export default function NetsuiteOrders() {
 
       const fn = await getNSOrders(data);
       const nsOrders = await fn;
-      const totalCount = nsOrders?.orders.length;
+      const totalCount = nsOrders?.orders?.length;
       const orders = nsOrders?.orders;
 
       setAllOrders(orders);
-      setAllTotal(totalCount);
+      setAllTotal(totalCount ? totalCount : 0);
       setRowsPerPage(10);
       setPage(0);
 
@@ -134,7 +134,7 @@ export default function NetsuiteOrders() {
   const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - allTotal) : 0;
 
   const visibleRows = useMemo(
-    () => allOrders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    () => allOrders?.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [page, rowsPerPage],
   );
@@ -153,7 +153,7 @@ export default function NetsuiteOrders() {
             <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle" size="medium">
               <EnhancedTableHead />
               <TableBody>
-                {visibleRows.map((data: any) => {
+                {visibleRows?.map((data: any) => {
                   return (
                     <TableRow
                       hover
