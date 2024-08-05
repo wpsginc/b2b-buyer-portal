@@ -5,12 +5,27 @@ import { STORE_DEFAULT_LOGO } from '@/constants';
 import { useMobile } from '@/hooks';
 import { GlobaledContext } from '@/shared/global';
 
+const {
+  VITE_B2B_TFS_LOGO,
+  VITE_B2B_OS_LOGO,
+  VITE_B2B_EMS_LOGO,
+  VITE_B2B_GD_LOGO
+} = import.meta.env; 
+
+const TFS_LOGO = VITE_B2B_TFS_LOGO;
+const OS_LOGO = VITE_B2B_OS_LOGO;
+const EMS_LOGO = VITE_B2B_EMS_LOGO;
+const GD_LOGO = VITE_B2B_GD_LOGO;
+
 export default function B3Logo() {
   const {
-    state: { logo },
+    state: {},
   } = useContext(GlobaledContext);
 
   const [isMobile] = useMobile();
+
+  const location = window.location.href;
+  const storeLogo = location.includes("firestore") ? TFS_LOGO : location.includes("officer") ? OS_LOGO : location.includes("ems") ? EMS_LOGO : location.includes("gideon") ? GD_LOGO : TFS_LOGO;
 
   return (
     <Box
@@ -47,7 +62,7 @@ export default function B3Logo() {
           window.location.href = '/';
         }}
       >
-        <img src={logo || STORE_DEFAULT_LOGO} alt="logo" />
+        <img src={storeLogo || STORE_DEFAULT_LOGO} alt="logo" />
       </ImageListItem>
     </Box>
   );

@@ -107,6 +107,18 @@ export default function B3Mainheader({ title }: { title: string }) {
             >
               {b3Lang('global.B3MainHeader.home')}
             </Button>
+            <Button
+              sx={{
+                color: '#333333',
+                fontWeight: 700,
+                fontSize: '16px',
+              }}
+              onClick={() => {
+                window.location.href = '/wishlist.php';
+              }}
+            >
+              {b3Lang('global.B3MainHeader.wishlist')}
+            </Button>
             {purchasabilityPermission && (
               <Button
                 sx={{
