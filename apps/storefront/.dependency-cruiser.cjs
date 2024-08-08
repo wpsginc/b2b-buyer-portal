@@ -23,6 +23,10 @@ module.exports = {
           '^src/buyerPortal.ts',
           // This should be removed once we get proper gql types
           'src/types/gql/index.ts',
+          '^src/components/table/CustomPagination.tsx',
+          '^src/pages/ShoppingLists/index.tsx',
+          '^src/pages/QuotesList/index.tsx',
+          '^src/pages/Invoice/index.tsx'
         ],
         numberOfDependentsLessThan: 1,
       },
