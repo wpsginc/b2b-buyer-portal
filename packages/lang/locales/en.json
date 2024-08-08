@@ -121,6 +121,7 @@
   "global.masquerade.youAreMasqueradeAs": "You are masquerade as",
   "global.addtoCart.purchasableAbdoosTip": "Products are out of stock or there are products that cannot be purchased.",
   "global.companyCredit.alert": "Your account does not currently allow purchasing due to a credit hold. Please contact us to reconcile.",
+  "global.B3Upload.downloadErrorResults": "Download error results",
 
   "dashboard.company": "Company",
   "dashboard.admin": "Admin",
@@ -292,7 +293,7 @@
   "purchasedProducts.quickOrderPad.addProductsToCart": "Add products to cart",
   "purchasedProducts.quickOrderPad.quickOrderPad": "Quick order pad",
   "purchasedProducts.quickOrderPad.bulkUploadCSV": "Bulk upload CSV",
-  "purchasedProducts.quickOrderPad.downloadErrorsCSV": "Download errors csv",
+  "purchasedProducts.quickOrderPad.downloadErrorsCSV": "Download error results",
   "purchasedProducts.quickOrderPad.addToCart": "Add to cart",
   "purchasedProducts.quickAdd.addProductToList": "Add product to list",
   "purchasedProducts.quickAdd.title": "Quick add",
@@ -327,7 +328,6 @@
   "purchasedProducts.error.failedApplication": "Application failed, please contact the merchant.",
   "purchasedProducts.success.rmaSuccessfulApplication": "The application is successful, please wait for the merchant's review",
   "purchasedProducts.success.rmaErrorApplication": "Item(s) already been requested, please wait for the merchant's review",
-
 
   "orderDetail.orderId": "Order #{orderId}",
   "returnDetail.orderId": "Order #{orderId}",
