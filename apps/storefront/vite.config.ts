@@ -93,7 +93,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       minify: true,
-      outDir: mode === 'production' ? 'dist/production' : 'dist/staging',
+      outDir: 'dist',
       rollupOptions: {
         input: {
           index: 'src/main.ts',
