@@ -203,7 +203,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
     if (accountType === '1') {
       const formData = getValues();
       const attachmentsFilesFiled = newCompInfo.find(
-        (info) => info.fieldId === 'field_attachments',
+        (info: any) => info.fieldId === 'field_attachments',
       );
       if (
         !isEmpty(attachmentsFilesFiled) &&
@@ -253,7 +253,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
 
             if (messageArr.length >= 2) {
               const field = extraCompanyInformation.find(
-                (field) => Base64.decode(field.name) === messageArr[0],
+                (field: any) => Base64.decode(field.name) === messageArr[0],
               );
               if (field) {
                 setError(field.name, {

@@ -1,3 +1,7 @@
+
+
+## [2.0.1](https://github.com/wpsginc/b2b-buyer-portal/compare/2.1.0...2.0.1) (2024-08-13)
+
 ## [2.0.0](https://github.com/bigcommerce/b2b-buyer-portal/compare/1.0.0...2.0.0) (2024-05-03)
 
 ### Features
