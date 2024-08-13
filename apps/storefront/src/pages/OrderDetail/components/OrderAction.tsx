@@ -6,7 +6,7 @@ import { Box, Card, CardContent, Divider, Typography } from '@mui/material';
 import throttle from 'lodash-es/throttle';
 
 import CustomButton from '@/components/button/CustomButton';
-import { isB2BUserSelector, rolePermissionSelector, useAppSelector } from '@/store';
+import { isB2BUserSelector, useAppSelector } from '@/store';
 import {
   b2bPrintInvoice,
   currencyFormat,
@@ -268,12 +268,12 @@ export default function OrderAction(props: OrderActionProps) {
   const { detailsData } = props;
   const b3Lang = useB3Lang();
   const isB2BUser = useAppSelector(isB2BUserSelector);
-  const emailAddress = useAppSelector(({ company }) => company.customer.emailAddress);
+  // const emailAddress = useAppSelector(({ company }) => company.customer.emailAddress);
   const role = useAppSelector(({ company }) => company.customer.role);
-  const b2bPermissions = useAppSelector(rolePermissionSelector);
+  // const b2bPermissions = useAppSelector(rolePermissionSelector);
 
   const {
-    state: { addressLabelPermission, createdEmail },
+    state: { addressLabelPermission },
   } = useContext(OrderDetailsContext);
 
   const {
@@ -291,8 +291,7 @@ export default function OrderAction(props: OrderActionProps) {
     return null;
   }
 
-  const { purchasabilityPermission, shoppingListActionsPermission, getInvoicesPermission } =
-    b2bPermissions;
+  // const {} = b2bPermissions;
 
   const getCompanyName = (company: string) => {
     if (addressLabelPermission) {
@@ -365,7 +364,9 @@ export default function OrderAction(props: OrderActionProps) {
       key: 'Re-Order',
       name: 'reOrder',
       variant: 'outlined',
-      isCanShow: isB2BUser ? purchasabilityPermission : true,
+      // isCanShow: isB2BUser ? purchasabilityPermission : true,
+      // hidden as of 08/10/24 until this function is needed
+      isCanShow: false,
     },
     {
       value: b3Lang('orderDetail.return'),
@@ -382,11 +383,13 @@ export default function OrderAction(props: OrderActionProps) {
       key: 'add-to-shopping-list',
       name: 'shoppingList',
       variant: 'outlined',
-      isCanShow: isB2BUser ? shoppingListActionsPermission : true,
+      // isCanShow: isB2BUser ? shoppingListActionsPermission : true,
+      // hidden as of 08/10/24 until this function is needed
+      isCanShow: false,
     },
   ];
 
-  const invoiceBtnPermissions = +ipStatus !== 0 || createdEmail === emailAddress;
+  // const invoiceBtnPermissions = +ipStatus !== 0 || createdEmail === emailAddress;
   const orderData: OrderData[] = [
     {
       header: b3Lang('orderDetail.summary'),
@@ -418,9 +421,11 @@ export default function OrderAction(props: OrderActionProps) {
           key: 'aboutInvoice',
           name: isB2BUser ? 'viewInvoice' : 'printInvoice',
           variant: 'outlined',
-          isCanShow: isB2BUser
-            ? invoiceBtnPermissions && getInvoicesPermission
-            : invoiceBtnPermissions,
+          // isCanShow: isB2BUser
+          //   ? invoiceBtnPermissions && invoiceBtnPermissions
+          //   : invoiceBtnPermissions,
+          // hidden ao 08/12/24 until needed
+          isCanShow: false,
         },
       ],
       infos: {

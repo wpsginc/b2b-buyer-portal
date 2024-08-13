@@ -83,10 +83,28 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
       info.tipText = 'This email will be used to sign in to your account';
     }
 
+    if (contactInfo.fieldId === 'field_phone_number' && accountType === '1') {
+      info.isTip = true;
+      info.tipText = 'Please enter your 10 digit phone number';
+      info.maxLength = 10;
+      info.pattern = '[0-9]*';
+    }
+
     return contactInfo;
   });
 
-  const contactInfo: any = accountType === '1' ? newContactInformation : bcContactInformation || [];
+  const newbcContactInformation = bcContactInformation?.map((contactInfo: CustomFieldItems) => {
+    const info = contactInfo;
+    if (contactInfo.fieldId === 'field_phone_number' && accountType === '1') {
+      info.isTip = true;
+      info.tipText = 'Please enter your 10 digit phone number';
+    }
+
+    return contactInfo;
+  });
+
+  const contactInfo: any =
+    accountType === '1' ? newContactInformation : newbcContactInformation || [];
   const contactName = accountType === '1' ? 'contactInformation' : 'bcContactInformationFields';
 
   const contactInformationLabel = contactInfo.length ? contactInfo[0]?.groupName : '';

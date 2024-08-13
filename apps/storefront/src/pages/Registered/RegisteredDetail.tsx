@@ -62,6 +62,29 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
   const addressBasicName = accountType === '1' ? 'addressBasicFields' : 'bcAddressBasicFields';
   const addressBasicList = accountType === '1' ? addressBasicFields : bcAddressBasicFields;
 
+  const updatedCompanyInformation = companyInformation?.map(
+    (customFieldsInfo: CustomFieldItems) => {
+      const info = customFieldsInfo;
+      if (customFieldsInfo.label.toLowerCase() === 'do you need terms?' && accountType === '1') {
+        info.isTip = true;
+        info.tipText = `Requesting for terms will require you to submit a form, click here to learn more, `;
+        info.termsLink = '/terms-info';
+      }
+
+      if (customFieldsInfo.fieldId === 'field_company_phone_number' && accountType === '1') {
+        info.isTip = true;
+        info.tipText = `Please enter company 10 digit phone number `;
+        info.maxLength = 10;
+        info.pattern = '[0-9]*';
+      }
+
+      return customFieldsInfo;
+    },
+  );
+
+  const newCompInfo: any =
+    accountType === '1' ? updatedCompanyInformation : companyInformation || [];
+
   const addressName = addressBasicList[0]?.groupName || '';
 
   const handleCountryChange = useCallback(
@@ -152,7 +175,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
   }
 
   const saveDetailsData = () => {
-    const data = [...companyInformation, ...companyAttachment, ...addressBasicList].reduce(
+    const data = [...newCompInfo, ...companyAttachment, ...addressBasicList].reduce(
       (formValues: DetailsFormValues, field: RegisterFields) => {
         const values = formValues;
         values[field.name] = getValues(field.name) || field.default;
@@ -162,7 +185,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
       {},
     );
 
-    const newCompanyInformation = setRegisterFieldsValue(companyInformation, data);
+    const newCompanyInformation = setRegisterFieldsValue(newCompInfo, data);
     const newCompanyAttachment = setRegisterFieldsValue(companyAttachment, data);
     const newAddressBasicFields = setRegisterFieldsValue(addressBasicList, data);
 
@@ -179,7 +202,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
   const handleValidateAttachmentFiles = () => {
     if (accountType === '1') {
       const formData = getValues();
-      const attachmentsFilesFiled = companyInformation.find(
+      const attachmentsFilesFiled = newCompInfo.find(
         (info) => info.fieldId === 'field_attachments',
       );
       if (
@@ -211,7 +234,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
 
       try {
         if (accountType === '1') {
-          const extraCompanyInformation = companyInformation.filter(
+          const extraCompanyInformation = newCompInfo.filter(
             (item: RegisterFields) => !!item.custom,
           );
           const extraFields = extraCompanyInformation.map((field: RegisterFields) => ({
@@ -292,7 +315,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         <Box>
           <InformationFourLabels>{businessDetailsName}</InformationFourLabels>
           <B3CustomForm
-            formFields={[...companyInformation]}
+            formFields={[...newCompInfo]}
             errors={errors}
             control={control}
             getValues={getValues}

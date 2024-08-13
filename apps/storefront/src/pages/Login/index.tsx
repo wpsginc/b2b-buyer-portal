@@ -25,6 +25,7 @@ import { channelId, getB3PermissionsList, loginJump, snackbar, storeHash } from 
 import b2bLogger from '@/utils/b3Logger';
 import { logoutSession } from '@/utils/b3logout';
 import { deleteCartData } from '@/utils/cartUtils';
+import { getStoreLogo } from '@/utils/customLogoChecker';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
 
 import { type PageProps } from '../PageProps';
@@ -97,7 +98,7 @@ export default function Login(props: PageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const {
-    state: { isCheckout, logo, registerEnabled },
+    state: { isCheckout, registerEnabled },
   } = useContext(GlobaledContext);
 
   const {
@@ -128,7 +129,7 @@ export default function Login(props: PageProps) {
     widgetHeadText: topHtmlRegionEnabled ? topHtmlRegionHtml : undefined,
     widgetBodyText: createAccountPanelHtml || defaultCreateAccountPanel,
     widgetFooterText: bottomHtmlRegionEnabled ? bottomHtmlRegionHtml : undefined,
-    logo: displayStoreLogo ? logo : undefined,
+    logo: displayStoreLogo ? getStoreLogo() : undefined,
   };
 
   useEffect(() => {
