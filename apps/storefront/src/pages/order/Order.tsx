@@ -298,8 +298,8 @@ function Order({ isCompanyOrder = false }: OrderProps) {
     >
       <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: '20px' }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="order tab">
-          <Tab label="BigCommerce" />
-          <Tab label="Netsuite" />
+          <Tab label="Web Orders" />
+          <Tab label="All Orders / Returns" />
         </Tabs>
       </Box>
 

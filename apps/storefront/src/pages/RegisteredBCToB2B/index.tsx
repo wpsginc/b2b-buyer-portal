@@ -16,6 +16,7 @@ import { GlobaledContext } from '@/shared/global';
 import { useAppSelector } from '@/store';
 import { channelId, loginJump, storeHash } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
+import { getStoreLogo } from '@/utils/customLogoChecker';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
 
 import {
@@ -90,7 +91,7 @@ export default function RegisteredBCToB2B(props: PageProps) {
   });
 
   const {
-    state: { storeName, logo, blockPendingAccountOrderCreation, registerEnabled },
+    state: { storeName, blockPendingAccountOrderCreation, registerEnabled },
   } = useContext(GlobaledContext);
 
   const navigate = useNavigate();
@@ -630,7 +631,7 @@ export default function RegisteredBCToB2B(props: PageProps) {
                 },
             }}
           >
-            {logo && (
+            {getStoreLogo() && (
               <RegisteredImage>
                 <ImageListItem
                   sx={{
@@ -640,7 +641,11 @@ export default function RegisteredBCToB2B(props: PageProps) {
                     window.location.href = '/';
                   }}
                 >
-                  <img src={`${logo}`} alt={b3Lang('global.tips.registerLogo')} loading="lazy" />
+                  <img
+                    src={`${getStoreLogo()}`}
+                    alt={b3Lang('global.tips.registerLogo')}
+                    loading="lazy"
+                  />
                 </ImageListItem>
               </RegisteredImage>
             )}

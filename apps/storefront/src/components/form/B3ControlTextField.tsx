@@ -36,6 +36,7 @@ export default function B3ControlTextField({ control, errors, ...rest }: Form.B3
     fieldId,
     isEnterTrigger,
     handleEnterClick,
+    pattern,
   } = rest;
 
   const b3Lang = useB3Lang();
@@ -79,6 +80,7 @@ export default function B3ControlTextField({ control, errors, ...rest }: Form.B3
     maxLength,
     minLength,
     readOnly,
+    pattern,
   };
 
   const muiAttributeProps = muiTextFieldProps

@@ -1,7 +1,7 @@
 import { ChangeEvent } from 'react';
 import { Controller } from 'react-hook-form';
 import { useB3Lang } from '@b3/lang';
-import { FormControl, FormHelperText, InputLabel, MenuItem, Select } from '@mui/material';
+import { Box, FormControl, FormHelperText, InputLabel, MenuItem, Select } from '@mui/material';
 
 import Form from './ui';
 
@@ -21,6 +21,9 @@ export default function B3ControlSelect({ control, errors, ...rest }: Form.B3UIP
     size = 'small',
     disabled = false,
     extraPadding,
+    isTip = false,
+    tipText = '',
+    termsLink = '',
   } = rest;
 
   const b3Lang = useB3Lang();
@@ -103,6 +106,17 @@ export default function B3ControlSelect({ control, errors, ...rest }: Form.B3UIP
         <FormHelperText error={!!errors[name]}>
           {errors[name] ? errors[name].message : null}
         </FormHelperText>
+      )}
+      {isTip && (
+        <Box
+          sx={{
+            fontSize: '12px',
+            color: 'rgba(0, 0, 0, 0.6)',
+            marginTop: '0.5rem',
+          }}
+        >
+          {tipText} <a href={termsLink}>Terms Information</a>
+        </Box>
       )}
     </FormControl>
   ) : null;
