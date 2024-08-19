@@ -115,7 +115,10 @@ export default function B3ControlSelect({ control, errors, ...rest }: Form.B3UIP
             marginTop: '0.5rem',
           }}
         >
-          {tipText} <a href={termsLink}>Terms Information</a>
+          {tipText}{' '}
+          <a href={termsLink} target="_blank" rel="noreferrer">
+            Terms Information
+          </a>
         </Box>
       )}
     </FormControl>
