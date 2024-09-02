@@ -445,8 +445,21 @@ export default function RegisterComplete(props: RegisterCompleteProps) {
               blockPendingAccountOrderCreation,
             },
           });
+
           saveRegisterPassword(completeData);
           await handleSendSubscribersState();
+
+          // listrak click event trigger
+          if (list && list.length > 0) {
+            const emailMe = list.find(
+              (item: CustomFieldItems) =>
+                item.fieldId === 'field_email_marketing_newsletter' &&
+                item.fieldType === 'checkbox',
+            );
+            const isChecked = emailMe?.isChecked || false;
+            if (isChecked) window.parent.postMessage('AccountSubscribe', '*');
+          }
+
           handleNext();
         } catch (err: any) {
           setErrorMessage(err?.message || err);
