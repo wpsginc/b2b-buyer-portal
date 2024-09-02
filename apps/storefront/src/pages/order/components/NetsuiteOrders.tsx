@@ -13,6 +13,7 @@ import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 
 import B3Spin from '@/components/spin/B3Spin';
+import { useMobile } from '@/hooks';
 import { getNSOrders } from '@/shared/service/b2b';
 import { useAppSelector } from '@/store';
 
@@ -51,9 +52,21 @@ const headCells = [
   },
 ];
 
+// console.log(isMobile);
+
 function EnhancedTableHead() {
+  const [isMobile] = useMobile();
+
   return (
-    <TableHead>
+    <TableHead
+      sx={
+        isMobile
+          ? { display: 'none' }
+          : {
+              display: 'table-header-group',
+            }
+      }
+    >
       <TableRow>
         {headCells.map((headCell) => (
           <TableCell align="center" key={headCell.id}>
@@ -74,6 +87,7 @@ export default function NetsuiteOrders() {
   const customerId = useAppSelector(({ company }) => company.customer.id);
 
   const navigate = useNavigate();
+  const [isMobile] = useMobile();
 
   useEffect(() => {
     const initializeOrders = async () => {
@@ -148,47 +162,125 @@ export default function NetsuiteOrders() {
           flex: 1,
         }}
       >
-        <Paper sx={{ width: '100%', mb: 2 }}>
-          <TableContainer>
-            <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle" size="medium">
-              <EnhancedTableHead />
-              <TableBody>
-                {visibleRows?.map((data: any) => {
-                  return (
-                    <TableRow
-                      hover
-                      onClick={() => handleClick(data.nsOrderInternalID)}
-                      role="checkbox"
-                      tabIndex={-1}
-                      key={data.nsOrderInternalID}
-                      sx={{ cursor: 'pointer' }}
-                    >
-                      <TableCell align="center">
-                        {data.bcOrderNum ? data.bcOrderNum : '-'}
-                      </TableCell>
-                      <TableCell align="center">{data.orderNumber}</TableCell>
-                      <TableCell align="center">
-                        <OrderStatus code={data.status} />
-                      </TableCell>
-                      <TableCell align="center">
-                        {data.returnable === true ? 'Yes' : 'No'}
-                      </TableCell>
-                      <TableCell align="center">{dateFormat(data.date)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-                {emptyRows > 0 && (
-                  <TableRow
-                    style={{
-                      height: 53 * emptyRows,
-                    }}
+        <Paper sx={isMobile ? { boxShadow: 'unset' } : { width: '100%' }}>
+          {isMobile ? (
+            visibleRows?.map((data: any) => {
+              return (
+                <Box
+                  key={data.nsOrderInternalID}
+                  onClick={() => handleClick(data.nsOrderInternalID)}
+                  sx={{
+                    padding: '20px',
+                    boxShadow: '0 5px 5px -6px #777',
+                    marginBottom: '30px',
+                    backgroundColor: '#ffffff',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <Box
+                    sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}
                   >
-                    <TableCell colSpan={5} />
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                    <Box
+                      sx={{
+                        fontSize: '15px',
+                        color: 'rgba(0, 0, 0, 0.6)',
+                        marginTop: '0.5rem',
+                      }}
+                    >
+                      Order#: {data.bcOrderNum ? data.bcOrderNum : '-'}
+                    </Box>
+                    <Box
+                      sx={{
+                        fontSize: '15px',
+                        color: 'rgba(0, 0, 0, 0.6)',
+                        marginTop: '0.5rem',
+                      }}
+                    >
+                      <OrderStatus code={data.status} />
+                    </Box>
+                  </Box>
+
+                  <Box
+                    sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}
+                  >
+                    <Box
+                      sx={{
+                        fontSize: '20px',
+                        color: '#191819',
+                        marginTop: '0.5rem',
+                      }}
+                    >
+                      SO#: {data.orderNumber}
+                    </Box>
+                  </Box>
+                  <Box
+                    sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}
+                  >
+                    <Box
+                      sx={{
+                        fontSize: '15px',
+                        color: 'rgba(0, 0, 0, 0.6)',
+                        marginTop: '0.5rem',
+                      }}
+                    >
+                      {data.returnable === true ? 'Returnable' : 'Non-Returnable'}
+                    </Box>
+                    <Box
+                      sx={{
+                        fontSize: '15px',
+                        color: 'rgba(0, 0, 0, 0.6)',
+                        marginTop: '0.5rem',
+                      }}
+                    >
+                      {dateFormat(data.date)}
+                    </Box>
+                  </Box>
+                </Box>
+              );
+            })
+          ) : (
+            <TableContainer>
+              <Table aria-labelledby="netsuiteOrders" size="medium">
+                <EnhancedTableHead />
+                <TableBody>
+                  {visibleRows?.map((data: any) => {
+                    return (
+                      <TableRow
+                        hover
+                        onClick={() => handleClick(data.nsOrderInternalID)}
+                        role="checkbox"
+                        tabIndex={-1}
+                        key={data.nsOrderInternalID}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell align="center">
+                          {data.bcOrderNum ? data.bcOrderNum : '-'}
+                        </TableCell>
+                        <TableCell align="center">{data.orderNumber}</TableCell>
+                        <TableCell align="center">
+                          <OrderStatus code={data.status} />
+                        </TableCell>
+                        <TableCell align="center">
+                          {data.returnable === true ? 'Yes' : 'No'}
+                        </TableCell>
+                        <TableCell align="center">{dateFormat(data.date)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {emptyRows > 0 && (
+                    <TableRow
+                      style={{
+                        height: 53 * emptyRows,
+                      }}
+                    >
+                      <TableCell colSpan={5} />
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
