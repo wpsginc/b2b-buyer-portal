@@ -13,7 +13,6 @@ import { bcLogin } from '@/shared/service/bc';
 import { themeFrameSelector, useAppSelector } from '@/store';
 import { B3SStorage, loginJump } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
-import { getStoreLogo } from '@/utils/customLogoChecker';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
 
 import { loginCheckout, LoginConfig } from '../Login/config';
@@ -48,7 +47,7 @@ function Registered(props: PageProps) {
   const IframeDocument = useAppSelector(themeFrameSelector);
 
   const {
-    state: { isCheckout, isCloseGotoBCHome, storeName, registerEnabled },
+    state: { isCheckout, isCloseGotoBCHome, logo, storeName, registerEnabled },
   } = useContext(GlobaledContext);
 
   const {
@@ -316,7 +315,7 @@ function Registered(props: PageProps) {
               alignItems: 'center',
             }}
           >
-            {getStoreLogo() && (
+            {logo && (
               <RegisteredImage>
                 <ImageListItem
                   sx={{
@@ -326,11 +325,7 @@ function Registered(props: PageProps) {
                     window.location.href = '/';
                   }}
                 >
-                  <img
-                    src={`${getStoreLogo()}`}
-                    alt={b3Lang('global.tips.registerLogo')}
-                    loading="lazy"
-                  />
+                  <img src={`${logo}`} alt={b3Lang('global.tips.registerLogo')} loading="lazy" />
                 </ImageListItem>
               </RegisteredImage>
             )}
