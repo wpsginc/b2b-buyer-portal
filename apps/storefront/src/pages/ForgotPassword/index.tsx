@@ -10,21 +10,13 @@ import { Captcha } from '@/components/form';
 import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-// import { GlobaledContext } from '@/shared/global';
+import { GlobaledContext } from '@/shared/global';
 import { getStorefrontToken, requestResetPassword } from '@/shared/service/b2b/graphql/recaptcha';
 import b2bLogger from '@/utils/b3Logger';
 
 import { getForgotPasswordFields, LoginConfig, sendEmail } from '../Login/config';
 import { B3ResetPassWordButton, LoginImage } from '../Login/styled';
 import { type PageProps } from '../PageProps';
-
-const { VITE_B2B_TFS_LOGO, VITE_B2B_OS_LOGO, VITE_B2B_EMS_LOGO, VITE_B2B_GD_LOGO } = import.meta
-  .env;
-
-const TFS_LOGO = VITE_B2B_TFS_LOGO;
-const OS_LOGO = VITE_B2B_OS_LOGO;
-const EMS_LOGO = VITE_B2B_EMS_LOGO;
-const GD_LOGO = VITE_B2B_GD_LOGO;
 
 interface ForgotPasswordProps extends PageProps {
   logo?: string;
@@ -204,14 +196,10 @@ export function ForgotPassword({
 }
 
 export default function Page({ setOpenPage }: PageProps) {
+  const { logo } = useContext(GlobaledContext).state;
   const { loginPageDisplay } = useContext(CustomStyleContext).state;
   const [isEnabledOnStorefront, setIsEnabledOnStorefront] = useState(false);
   const [storefrontSiteKey, setStorefrontSiteKey] = useState('');
-  const location = window.location.href;
-  let storeLogo = TFS_LOGO;
-  if (location.includes('officer')) storeLogo = OS_LOGO;
-  if (location.includes('ems')) storeLogo = EMS_LOGO;
-  if (location.includes('gideon')) storeLogo = GD_LOGO;
 
   useEffect(() => {
     const getIsEnabledOnStorefront = async () => {
@@ -233,7 +221,7 @@ export default function Page({ setOpenPage }: PageProps) {
   return (
     <ForgotPassword
       setOpenPage={setOpenPage}
-      logo={loginPageDisplay.displayStoreLogo ? storeLogo : undefined}
+      logo={loginPageDisplay.displayStoreLogo ? logo : undefined}
       isEnabledOnStorefront={isEnabledOnStorefront}
       storefrontSiteKey={storefrontSiteKey}
     />

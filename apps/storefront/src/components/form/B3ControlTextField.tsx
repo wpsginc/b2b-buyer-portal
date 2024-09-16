@@ -129,9 +129,20 @@ export default function B3ControlTextField({ control, errors, ...rest }: Form.B3
         'Digit8',
         'Digit9',
         'Enter',
+        'Digit0',
+        'Numpad0',
+        'Numpad1',
+        'Numpad2',
+        'Numpad3',
+        'Numpad4',
+        'Numpad5',
+        'Numpad6',
+        'Numpad7',
+        'Numpad8',
+        'Numpad9',
         'Backspace',
       ];
-      if (allowedKeys.indexOf(event.code) < 1) {
+      if (allowedKeys.indexOf(event.code) < 0) {
         event.preventDefault();
       }
     }
