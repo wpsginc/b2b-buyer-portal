@@ -2,6 +2,8 @@ import styled from '@emotion/styled';
 
 export const StyleTipContainer = styled('p')(() => ({
   margin: '2rem auto',
+  whiteSpace: 'break-spaces',
+  textAlign: 'justify' as const,
 }));
 
 export const InformationLabels = styled('h3')(() => ({
