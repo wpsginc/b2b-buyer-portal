@@ -49,7 +49,7 @@
   "global.validatorRules.passwords": "Passwords must be at least 7 characters and contain both alphabetic and numeric characters.",
   "global.tips.registerLogo": "register Logo",
   "global.registerComplete.passwordMatchPrompt": "Your passwords do not match.",
-  "global.registerFinish.autoApproved.tip": "Thank you for creating your account at {storeName}. Your company account application has been approved",
+  "global.registerFinish.autoApproved.tip": "Thank you for applying for a business account with {storeName}. Your account has been successfully created in our system and you may now proceed with placing an order!\n\nIf you have requested terms, please note that your application is under review. Your order will be placed on hold until terms are approved but you may place an order with a credit card if you require the items sooner.\n\nFor tax-exempt status make sure you have submitted your tax-exempt certificate. The certificate will need to be reviewed and approved prior to your order being tax exempt.\n\nYou can review your account, and we will notify you as soon as it is fully activated.",
   "global.registerFinish.notAutoApproved.tip": "Some account and purchase functionality may not be available until your account is approved. We look forward to serving you.",
   "global.registerFinish.notAutoApproved.warningTip": "Your business account application has been submitted. Please allow 24 hours for account approval and activation. But part of the functionality is already available to you, please review your account.",
   "global.registerFinish.bcSuccess.tip": "Thank you for creating your account at {storeName}",
