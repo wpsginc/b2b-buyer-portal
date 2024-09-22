@@ -228,9 +228,23 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
   const handleAccountToFinish = (event: MouseEvent) => {
     const hasAttachmentsFilesError = handleValidateAttachmentFiles();
 
+    const phoneNumber =
+      companyInformation?.find(
+        (item: CustomFieldItems) => item.fieldId === 'field_company_phone_number',
+      )?.name || 'phone';
+
     handleSubmit(async (data: CustomFieldItems) => {
       if (hasAttachmentsFilesError) return;
       showLoading(true);
+
+      if (data[phoneNumber]?.length > 10 || data[phoneNumber]?.length < 10) {
+        setError(phoneNumber, {
+          type: 'custom',
+          message: 'Please enter a valid phone number',
+        });
+        showLoading(false);
+        return;
+      }
 
       try {
         if (accountType === '1') {

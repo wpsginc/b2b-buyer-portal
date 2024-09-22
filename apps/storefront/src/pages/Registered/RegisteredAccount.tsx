@@ -133,6 +133,10 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
     contactInformation?.find((item: CustomFieldItems) => item.fieldId === 'field_email')?.name ||
     'email';
 
+  const phoneNumber =
+    contactInformation?.find((item: CustomFieldItems) => item.fieldId === 'field_phone_number')
+      ?.name || 'phone';
+
   const validateEmailValue = async (email: string) => {
     try {
       showLoading(true);
@@ -168,6 +172,14 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
   const handleAccountToDetail = async (event: MouseEvent) => {
     handleSubmit(async (data: CustomFieldItems) => {
       if (!(await validateEmailValue(data[emailName]))) {
+        return;
+      }
+
+      if (data[phoneNumber]?.length > 10 || data[phoneNumber]?.length < 10) {
+        setError(phoneNumber, {
+          type: 'custom',
+          message: 'Please enter a valid phone number',
+        });
         return;
       }
 

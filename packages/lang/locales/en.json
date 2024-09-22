@@ -659,7 +659,8 @@
   "register.label.companyAttachments": "Company attachments",
   "register.emailValidate.alreadyExitsBC": "The email address {email} is already in use. Please enter a different one.",
   "register.registeredSingleCheckBox.label": "Email me special promotions and updates",
-
+  "register.phoneNumberValidate.label": "Please enter 10 digit phone number",
+  
   "login.button.signIn": "Sign In",
   "login.button.signInUppercase": "SIGN IN",
   "login.button.createAccount": "CREATE ACCOUNT",
