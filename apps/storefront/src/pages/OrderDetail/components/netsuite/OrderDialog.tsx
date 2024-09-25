@@ -95,6 +95,8 @@ export default function OrderDialog({
         },
       ];
 
+      console.log("Return Data", data);
+
       const validateZero = data[0]?.line_items.filter((items) => items.quantityToReturn === 0);
       const validateReturnable = data[0]?.line_items.filter(
         (items) => items.quantityToReturn > items.returnableQty,

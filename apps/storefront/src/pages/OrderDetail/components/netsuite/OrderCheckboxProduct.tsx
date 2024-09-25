@@ -108,6 +108,15 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
             );
           } else if (+valueNum > product.returnableQuantity) {
             snackbar.error(b3Lang('purchasedProducts.error.rmaReturnableQty'));
+
+            returnList.forEach((listItem) => {
+              const item = listItem;
+              if (item.lineKey === product.lineKey) {
+                item.quantityToReturn = +valueNum;
+              }
+            });
+            setReturnArr(returnList);
+
           } else {
             returnList.forEach((listItem) => {
               const item = listItem;
@@ -119,7 +128,11 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
           }
         }
         onProductChange([...products]);
+        console.log("Return State", returnList);
       }
+
+      
+
     };
 
   const handleNumberInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -129,10 +142,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
   };
 
   const handleNumberInputBlur = (product: EditableQty) => () => {
-    // const editableProduct = product;
-    // || +product.editQuantity === 0
     if (!product.editQuantity) {
-      // editableProduct.editQuantity = '1';
       onProductChange([...products]);
     }
   };
