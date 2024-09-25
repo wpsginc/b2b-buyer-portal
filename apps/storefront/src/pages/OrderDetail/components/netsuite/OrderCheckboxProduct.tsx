@@ -116,7 +116,6 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
               }
             });
             setReturnArr(returnList);
-
           } else {
             returnList.forEach((listItem) => {
               const item = listItem;
@@ -128,11 +127,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
           }
         }
         onProductChange([...products]);
-        console.log("Return State", returnList);
       }
-
-      
-
     };
 
   const handleNumberInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
