@@ -19,6 +19,7 @@ import OrderCheckboxProduct from './OrderCheckboxProduct';
 interface ReturnListProps {
   lineKey: number;
   quantityToReturn: number;
+  returnableQty: number;
 }
 
 interface DialogData {
@@ -94,6 +95,22 @@ export default function OrderDialog({
         },
       ];
 
+      const validateZero = data[0]?.line_items.filter((items) => items.quantityToReturn === 0);
+      const validateReturnable = data[0]?.line_items.filter(
+        (items) => items.quantityToReturn > items.returnableQty,
+      );
+      if (validateZero.length > 0) {
+        snackbar.error(b3Lang('purchasedProducts.error.rmaReturnQtyZero'));
+        setIsRequestLoading(false);
+        return;
+      }
+
+      if (validateReturnable.length > 0) {
+        snackbar.error(b3Lang('purchasedProducts.error.rmaReturnableQty'));
+        setIsRequestLoading(false);
+        return;
+      }
+
       const req = createNSReturn(data);
       const postReturn = await req;
 
@@ -119,9 +136,7 @@ export default function OrderDialog({
   const handleSaveClick = () => {
     if (checkedArr.length === 0) {
       snackbar.error(b3Lang('purchasedProducts.error.selectOneItem'));
-    }
-
-    if (type === 'return') {
+    } else if (type === 'return') {
       handleReturn();
     }
   };

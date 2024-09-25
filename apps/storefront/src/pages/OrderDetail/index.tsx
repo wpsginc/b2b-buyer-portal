@@ -369,23 +369,27 @@ function OrderDetail() {
               text={getOrderStatusLabel(isNsOrder ? nsStatus : status)}
             />
           </Grid>
-          <Grid
-            container
-            item
-            xs={isMobile ? 12 : 4}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            {localtion?.state && (
-              <DetailPagination
-                onChange={(orderId) => handlePageChange(orderId)}
-                color={customColor}
-              />
-            )}
-          </Grid>
+          {!isNsOrder ? (
+            <Grid
+              container
+              item
+              xs={isMobile ? 12 : 4}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+              }}
+            >
+              {localtion?.state && (
+                <DetailPagination
+                  onChange={(orderId) => handlePageChange(orderId)}
+                  color={customColor}
+                />
+              )}
+            </Grid>
+          ) : (
+            ''
+          )}
         </Grid>
         {isNsOrder ? (
           <Grid

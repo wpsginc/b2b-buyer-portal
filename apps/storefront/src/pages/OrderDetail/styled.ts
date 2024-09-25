@@ -53,7 +53,7 @@ const FlexItem = styled('div')(
     flexGrow: width ? 0 : 1,
     flexShrink: width ? 0 : 1,
     alignItems: 'flex-start',
-    justifyContent: textAlignLocation === 'right' ? 'flex-end' : 'flex-start',
+    justifyContent: textAlignLocation,
     flexBasis,
     width,
     padding,
