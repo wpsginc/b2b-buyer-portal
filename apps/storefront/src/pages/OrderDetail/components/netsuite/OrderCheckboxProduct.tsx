@@ -19,6 +19,7 @@ import {
 interface ReturnListProps {
   lineKey: number;
   quantityToReturn: number;
+  returnableQty: number;
 }
 
 interface OrderCheckboxProductProps {
@@ -34,11 +35,9 @@ interface OrderCheckboxProductProps {
 export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
   const {
     products,
-    getProductQuantity = (item) => item.editQuantity,
     onProductChange = () => {},
     setCheckedArr = () => {},
     setReturnArr = () => {},
-    textAlign = 'left',
     type,
   } = props;
 
@@ -64,6 +63,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
         returnIds[index] = {
           lineKey: item.lineKey,
           quantityToReturn: +item.editQuantity,
+          returnableQty: item.returnableQuantity,
         };
       });
 
@@ -72,7 +72,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
     }
   };
 
-  const handleSelectChange = (lineKey: number, quantityToReturn: number) => {
+  const handleSelectChange = (lineKey: number, quantityToReturn: number, returnableQty: number) => {
     const newlist = [...list];
     const newReturnList = [...returnList];
     const index = newlist.findIndex((item) => item === lineKey);
@@ -85,6 +85,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
       newReturnList.push({
         lineKey,
         quantityToReturn,
+        returnableQty,
       });
     }
     setList(newlist);
@@ -105,6 +106,8 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
             snackbar.error(
               b3Lang('purchasedProducts.error.returnedQuantityShouldBeWithinThePurchase'),
             );
+          } else if (+valueNum > product.returnableQuantity) {
+            snackbar.error(b3Lang('purchasedProducts.error.rmaReturnableQty'));
           } else {
             returnList.forEach((listItem) => {
               const item = listItem;
@@ -126,9 +129,10 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
   };
 
   const handleNumberInputBlur = (product: EditableQty) => () => {
-    const editableProduct = product;
-    if (!product.editQuantity || +product.editQuantity === 0) {
-      editableProduct.editQuantity = '1';
+    // const editableProduct = product;
+    // || +product.editQuantity === 0
+    if (!product.editQuantity) {
+      // editableProduct.editQuantity = '1';
       onProductChange([...products]);
     }
   };
@@ -150,14 +154,17 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
       {!isMobile && (
         <Flex isHeader isMobile={isMobile}>
           <Checkbox checked={list.length === products.length} onChange={handleSelectAllChange} />
-          <FlexItem>
+          <FlexItem textAlignLocation="left">
             <ProductHead>{b3Lang('purchasedProducts.product')}</ProductHead>
           </FlexItem>
-          <FlexItem textAlignLocation={textAlign} {...itemStyle.default}>
-            <ProductHead>{b3Lang('global.searchProduct.qty')}</ProductHead>
+          <FlexItem textAlignLocation="center" {...itemStyle.default}>
+            <ProductHead>{b3Lang('global.searchProduct.qtyOrdered')}</ProductHead>
           </FlexItem>
-          <FlexItem textAlignLocation={textAlign} {...itemStyle.default}>
+          <FlexItem textAlignLocation="center" {...itemStyle.default}>
             <ProductHead>{b3Lang('global.searchProduct.returnable')}</ProductHead>
+          </FlexItem>
+          <FlexItem textAlignLocation="center" {...itemStyle.default}>
+            <ProductHead>{b3Lang('global.searchProduct.qtyreturnable')}</ProductHead>
           </FlexItem>
         </Flex>
       )}
@@ -178,40 +185,54 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
         <Flex isMobile={isMobile} key={product.sku}>
           <Checkbox
             checked={isChecked(product.lineKey)}
-            onChange={() => handleSelectChange(product.lineKey, +product.editQuantity)}
+            onChange={() =>
+              handleSelectChange(product.lineKey, +product.editQuantity, product.returnableQuantity)
+            }
           />
           <FlexItem>
-            <ProductImage src={PRODUCT_DEFAULT_IMAGE} />
+            <ProductImage src={product?.bcData?.images || PRODUCT_DEFAULT_IMAGE} />
             <Box
               sx={{
                 marginLeft: '16px',
               }}
             >
               <Typography variant="body1" color="#212121">
-                {product.descr}
+                {product?.bcData?.name || product.descr}
               </Typography>
               <Typography variant="body1" color="#616161">
                 {product.sku}
               </Typography>
             </Box>
           </FlexItem>
-          <FlexItem textAlignLocation={textAlign} padding="10px 0 0" {...itemStyle.default}>
-            {isMobile && <span>{b3Lang('purchasedProducts.orderCheckboxProduct.price')} </span>}
+          <FlexItem
+            textAlignLocation={isMobile ? 'left' : 'center'}
+            padding="10px 0 0"
+            {...itemStyle.default}
+          >
+            {isMobile && <span>{`${b3Lang('global.searchProduct.qty')} : `} </span>}
             {product.quantity}
           </FlexItem>
-          <FlexItem textAlignLocation={textAlign} {...itemStyle.default}>
+          <FlexItem
+            textAlignLocation={isMobile ? 'left' : 'center'}
+            padding="10px 0 0"
+            {...itemStyle.default}
+          >
+            {isMobile && <span>{`${b3Lang('global.searchProduct.returnable')} : `} </span>}
+            {product.returnableQuantity}
+          </FlexItem>
+          <FlexItem textAlignLocation={isMobile ? 'left' : 'center'} {...itemStyle.default}>
             <TextField
               type="number"
               variant="filled"
               hiddenLabel={!isMobile}
-              label={isMobile ? b3Lang('purchasedProducts.orderCheckboxProduct.qty') : ''}
-              value={getProductQuantity(product)}
+              label={isMobile ? `${b3Lang('global.searchProduct.qtyreturnable')} : ` : ''}
+              // value={getProductQuantity(product)}
               onChange={handleProductQuantityChange(product)}
               onKeyDown={handleNumberInputKeyDown}
               onBlur={handleNumberInputBlur(product)}
               size="small"
               sx={{
-                width: isMobile ? '60%' : '80px',
+                width: isMobile ? '100%' : '80px',
                 '& .MuiFormHelperText-root': {
                   marginLeft: '0',
                   marginRight: '0',

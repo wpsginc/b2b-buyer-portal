@@ -84,8 +84,15 @@ export interface OrderItemList {
   quantity: number;
   returnableQuantity: number;
   fulfilled: number;
+  bcData: BCItemData;
 }
 
+export interface BCItemData {
+  id: number;
+  sku: string;
+  name: string;
+  images: string;
+}
 export interface OrderShipmentProductItem {
   order_product_id: number;
   product_id: number;

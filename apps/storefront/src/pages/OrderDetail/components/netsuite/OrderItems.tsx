@@ -53,7 +53,7 @@ const Flex = styled('div')<FlexProps>(({ isHeader, isMobile }) => {
 
   return {
     color: '#212121',
-    display: 'flex',
+    display: isMobile && isHeader ? 'none' : 'flex',
     wordBreak: 'break-word',
     padding: '8px 0 0',
     gap: '8px',
@@ -67,7 +67,7 @@ const Flex = styled('div')<FlexProps>(({ isHeader, isMobile }) => {
 const FlexItem = styled('div')(
   ({ width, textAlignLocation, padding = '0', sx }: FlexItemProps) => ({
     display: 'flex',
-    justifyContent: textAlignLocation === 'right' ? 'flex-end' : 'flex-start',
+    justifyContent: textAlignLocation,
     flexGrow: width ? 0 : 1,
     flexShrink: width ? 0 : 1,
     alignItems: 'center',
@@ -145,13 +145,13 @@ export default function NSOrderItems(nsItemDetails: any) {
                 <FlexItem padding={isMobile ? '0' : '0 6% 0 1%'}>
                   <ProductHead>{b3Lang('global.searchProduct.product')}</ProductHead>
                 </FlexItem>
-                <FlexItem textAlignLocation="right" {...itemStyle.default}>
+                <FlexItem textAlignLocation="center" {...itemStyle.default}>
                   <ProductHead>{b3Lang('global.searchProduct.qty')}</ProductHead>
                 </FlexItem>
-                <FlexItem textAlignLocation="right" {...itemStyle.qty}>
+                <FlexItem textAlignLocation="center" {...itemStyle.qty}>
                   <ProductHead>{b3Lang('global.searchProduct.returnable')}</ProductHead>
                 </FlexItem>
-                <FlexItem textAlignLocation="right" {...itemStyle.default}>
+                <FlexItem textAlignLocation="center" {...itemStyle.default}>
                   <ProductHead>{b3Lang('global.searchProduct.fulfilled')}</ProductHead>
                 </FlexItem>
               </Flex>
@@ -161,7 +161,7 @@ export default function NSOrderItems(nsItemDetails: any) {
                 lineItem.map((item: any) => (
                   <Flex isMobile={isMobile} key={item.lineKey}>
                     <FlexItem padding={isMobile ? '0' : '0 6% 0 0'}>
-                      <ProductImage src={PRODUCT_DEFAULT_IMAGE} />
+                      <ProductImage src={item?.bcData?.images || PRODUCT_DEFAULT_IMAGE} />
                       <Box
                         sx={{
                           marginLeft: '16px',
@@ -174,7 +174,7 @@ export default function NSOrderItems(nsItemDetails: any) {
                             cursor: 'pointer',
                           }}
                         >
-                          {item?.descr}
+                          {item?.bcData?.name || item?.descr}
                         </Typography>
                         <Typography variant="body1" color="#616161">
                           {item?.sku}
@@ -183,46 +183,57 @@ export default function NSOrderItems(nsItemDetails: any) {
                     </FlexItem>
 
                     <FlexItem
-                      textAlignLocation="right"
                       padding=""
                       {...itemStyle.default}
                       sx={
                         isMobile
                           ? {
                               fontSize: '14px',
+                              justifyContent: 'left',
                             }
-                          : {}
+                          : {
+                              justifyContent: 'center',
+                            }
                       }
                     >
+                      {isMobile && <span>{`${b3Lang('global.searchProduct.qty')} : `} </span>}{' '}
                       {item?.quantity}
                     </FlexItem>
 
                     <FlexItem
-                      textAlignLocation="right"
                       {...itemStyle.qty}
                       sx={
                         isMobile
                           ? {
                               fontSize: '14px',
+                              justifyContent: 'left',
                             }
-                          : {}
+                          : {
+                              justifyContent: 'center',
+                            }
                       }
                     >
+                      {isMobile && (
+                        <span>{`${b3Lang('global.searchProduct.returnable')} : `} </span>
+                      )}{' '}
                       {item?.returnableQuantity}
                     </FlexItem>
 
                     <FlexItem
                       padding=""
                       {...itemStyle.default}
-                      textAlignLocation="right"
                       sx={
                         isMobile
                           ? {
                               fontSize: '14px',
+                              justifyContent: 'left',
                             }
-                          : {}
+                          : {
+                              justifyContent: 'center',
+                            }
                       }
                     >
+                      {isMobile && <span>{`${b3Lang('global.searchProduct.fulfilled')} : `} </span>}{' '}
                       {item?.fulfilled}
                     </FlexItem>
                   </Flex>

@@ -47,10 +47,10 @@ export default function OrderAction(nsItemDetails: any) {
 
   const buttons: Buttons[] = [
     {
-      value: b3Lang('orderDetail.return'),
+      value: b3Lang('orderDetail.returnRMA'),
       key: 'Return',
       name: 'return',
-      variant: 'outlined',
+      variant: 'contained',
       isCanShow: true,
     },
   ];
