@@ -97,6 +97,17 @@ const mobileItemStyle = {
   },
 };
 
+const statusNotes = (status: string) => {
+  let statusText = '';
+
+  // Allowed statuses, Partially Fullfilled / Fulfilled / Billed / Fully Billed
+  const statuses = ['fullyBilled', 'partiallyFulfilled', 'fulfilled', 'billed'];
+
+  const isExist = statuses.filter((stat) => stat === status);
+  if (isExist.length === 0) statusText = status;
+  return statusText;
+};
+
 export default function NSOrderItems(nsItemDetails: any) {
   const customerName = useAppSelector(
     ({ company }) => `${company.customer.firstName} ${company.customer.lastName}`,
@@ -141,7 +152,7 @@ export default function NSOrderItems(nsItemDetails: any) {
                 fontStyle: 'italic',
               }}
             >
-              {nsItemDetails?.nsItemDetails?.status !== b3Lang('orders.status.shipped')
+              {statusNotes(nsItemDetails?.nsItemDetails?.status)
                 ? b3Lang('purchasedProducts.error.rmaCannotProcessReturn', {
                     status: nsItemDetails?.nsItemDetails?.status,
                   })
