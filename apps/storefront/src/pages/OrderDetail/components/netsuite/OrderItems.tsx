@@ -132,6 +132,21 @@ export default function NSOrderItems(nsItemDetails: any) {
               {' – '}
               {companyName}
             </Typography>
+            <Typography
+              variant="h6"
+              sx={{
+                fontSize: '15px',
+                fontWeight: '700',
+                color: '#c12126',
+                fontStyle: 'italic',
+              }}
+            >
+              {nsItemDetails?.nsItemDetails?.status !== b3Lang('orders.status.shipped')
+                ? b3Lang('purchasedProducts.error.rmaCannotProcessReturn', {
+                    status: nsItemDetails?.nsItemDetails?.status,
+                  })
+                : ''}
+            </Typography>
           </Box>
           <Fragment key={`shipment-${nsItemDetails?.nsItemDetails?.nsOrderInternalID}`}>
             <Box

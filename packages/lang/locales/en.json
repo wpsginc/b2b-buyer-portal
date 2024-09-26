@@ -333,6 +333,9 @@
   "purchasedProducts.success.rmaErrorApplication": "Item(s) already been requested, please wait for the merchant's review",
   "purchasedProducts.error.rmaReturnQtyZero": "Quantity to return should be greater than zero (0)",
   "purchasedProducts.error.rmaReturnableQty": "The quantity to return should be within the allowed returnable quantity",
+  "purchasedProducts.error.rmaCannotProcessReturn": "Order status is {status}, you can't request a return for this order.",
+  "purchasedProducts.error.rmaNoAvailableItem": "--- No available item for return --- ",
+  "purchasedProducts.error.rmaErrorApplication": "Sorry there was a problem processing your request, please try again or contact our sales team.",
 
   "orderDetail.orderId": "Order #{orderId}",
   "returnDetail.orderId": "Order #{orderId}",

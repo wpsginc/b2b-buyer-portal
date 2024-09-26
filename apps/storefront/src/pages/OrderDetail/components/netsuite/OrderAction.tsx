@@ -91,6 +91,13 @@ export default function OrderAction(nsItemDetails: any) {
     setCurrentDialogData(newDialogData);
   };
 
+  const handleButton = () => {
+    if (itemDetails?.status !== b3Lang('orders.status.shipped')) {
+      return true;
+    }
+    return false;
+  };
+
   return (
     <Box
       sx={{
@@ -112,6 +119,7 @@ export default function OrderAction(nsItemDetails: any) {
                   key={button.key}
                   name={button.name}
                   variant={button.variant}
+                  disabled={handleButton()}
                   onClick={throttle(() => {
                     handleOpenDialog(button.name);
                   }, 2000)}

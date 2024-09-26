@@ -117,7 +117,7 @@ export default function OrderDialog({
       if (postReturn?.rmaID && postReturn?.rmaNumber) {
         snackbar.success(b3Lang('purchasedProducts.success.rmaSuccessfulApplication'));
       } else {
-        snackbar.error(b3Lang('purchasedProducts.success.rmaErrorApplication'));
+        snackbar.error(b3Lang('purchasedProducts.error.rmaErrorApplication'));
       }
 
       setIsRequestLoading(false);

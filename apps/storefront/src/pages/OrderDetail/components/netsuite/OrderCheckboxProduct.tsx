@@ -154,11 +154,19 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [returnList]);
 
-  return products.length > 0 ? (
+  // Fetch the only items available for return, where fulfilled qty is not yet equal to returnableqty
+  const productFilter = products.filter(
+    (item) => item.returnableQuantity.toString() !== item.fulfilled.toString(),
+  );
+
+  return productFilter.length > 0 ? (
     <Box>
       {!isMobile && (
         <Flex isHeader isMobile={isMobile}>
-          <Checkbox checked={list.length === products.length} onChange={handleSelectAllChange} />
+          <Checkbox
+            checked={list.length === productFilter.length}
+            onChange={handleSelectAllChange}
+          />
           <FlexItem textAlignLocation="left">
             <ProductHead>{b3Lang('purchasedProducts.product')}</ProductHead>
           </FlexItem>
@@ -167,6 +175,9 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
           </FlexItem>
           <FlexItem textAlignLocation="center" {...itemStyle.default}>
             <ProductHead>{b3Lang('global.searchProduct.returnable')}</ProductHead>
+          </FlexItem>
+          <FlexItem textAlignLocation="center" {...itemStyle.default}>
+            <ProductHead>{b3Lang('global.searchProduct.fulfilled')}</ProductHead>
           </FlexItem>
           <FlexItem textAlignLocation="center" {...itemStyle.default}>
             <ProductHead>{b3Lang('global.searchProduct.qtyreturnable')}</ProductHead>
@@ -178,7 +189,10 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
         <FormControlLabel
           label="Select all products"
           control={
-            <Checkbox checked={list.length === products.length} onChange={handleSelectAllChange} />
+            <Checkbox
+              checked={list.length === productFilter.length}
+              onChange={handleSelectAllChange}
+            />
           }
           sx={{
             paddingLeft: '0.6rem',
@@ -186,26 +200,30 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
         />
       )}
 
-      {products.map((product: EditableQty) => (
-        <Flex isMobile={isMobile} key={product.sku}>
+      {productFilter.map((productFilter: EditableQty) => (
+        <Flex isMobile={isMobile} key={productFilter.sku}>
           <Checkbox
-            checked={isChecked(product.lineKey)}
+            checked={isChecked(productFilter.lineKey)}
             onChange={() =>
-              handleSelectChange(product.lineKey, +product.editQuantity, product.returnableQuantity)
+              handleSelectChange(
+                productFilter.lineKey,
+                +productFilter.editQuantity,
+                productFilter.returnableQuantity,
+              )
             }
           />
           <FlexItem>
-            <ProductImage src={product?.bcData?.images || PRODUCT_DEFAULT_IMAGE} />
+            <ProductImage src={productFilter?.bcData?.images || PRODUCT_DEFAULT_IMAGE} />
             <Box
               sx={{
                 marginLeft: '16px',
               }}
             >
               <Typography variant="body1" color="#212121">
-                {product?.bcData?.name || product.descr}
+                {productFilter?.bcData?.name || productFilter.descr}
               </Typography>
               <Typography variant="body1" color="#616161">
-                {product.sku}
+                {productFilter.sku}
               </Typography>
             </Box>
           </FlexItem>
@@ -215,7 +233,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
             {...itemStyle.default}
           >
             {isMobile && <span>{`${b3Lang('global.searchProduct.qty')} : `} </span>}
-            {product.quantity}
+            {productFilter.quantity}
           </FlexItem>
           <FlexItem
             textAlignLocation={isMobile ? 'left' : 'center'}
@@ -223,7 +241,15 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
             {...itemStyle.default}
           >
             {isMobile && <span>{`${b3Lang('global.searchProduct.returnable')} : `} </span>}
-            {product.returnableQuantity}
+            {productFilter.returnableQuantity}
+          </FlexItem>
+          <FlexItem
+            textAlignLocation={isMobile ? 'left' : 'center'}
+            padding="10px 0 0"
+            {...itemStyle.default}
+          >
+            {isMobile && <span>{`${b3Lang('global.searchProduct.fulfilled')} : `} </span>}
+            {productFilter.fulfilled}
           </FlexItem>
           <FlexItem textAlignLocation={isMobile ? 'left' : 'center'} {...itemStyle.default}>
             <TextField
@@ -232,9 +258,9 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
               hiddenLabel={!isMobile}
               label={isMobile ? `${b3Lang('global.searchProduct.qtyreturnable')} : ` : ''}
               // value={getProductQuantity(product)}
-              onChange={handleProductQuantityChange(product)}
+              onChange={handleProductQuantityChange(productFilter)}
               onKeyDown={handleNumberInputKeyDown}
-              onBlur={handleNumberInputBlur(product)}
+              onBlur={handleNumberInputBlur(productFilter)}
               size="small"
               sx={{
                 width: isMobile ? '100%' : '80px',
@@ -243,12 +269,16 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
                   marginRight: '0',
                 },
               }}
-              error={!!product.helperText}
-              helperText={product.helperText}
+              error={!!productFilter.helperText}
+              helperText={productFilter.helperText}
             />
           </FlexItem>
         </Flex>
       ))}
     </Box>
-  ) : null;
+  ) : (
+    <Typography variant="body1" color="#c12126" fontSize={15}>
+      {b3Lang('purchasedProducts.error.rmaNoAvailableItem')}
+    </Typography>
+  );
 }
