@@ -155,11 +155,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
   }, [returnList]);
 
   // Fetch the only items available for return, where fulfilled qty is not yet equal to returnableqty
-  const productFilter = products.filter(
-    (item) =>
-      item.returnableQuantity.toString() !== item.fulfilled.toString() &&
-      item.returnableQuantity > 0,
-  );
+  const productFilter = products.filter((item) => item.returnableQuantity > 0);
 
   return productFilter.length > 0 ? (
     <Box>
