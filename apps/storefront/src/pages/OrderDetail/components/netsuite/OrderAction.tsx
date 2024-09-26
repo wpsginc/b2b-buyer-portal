@@ -92,7 +92,11 @@ export default function OrderAction(nsItemDetails: any) {
   };
 
   const handleButton = () => {
-    if (itemDetails?.status !== b3Lang('orders.status.shipped')) {
+    // Allowed statuses, Partially Fullfilled / Fulfilled / Billed / Fully Billed
+    const statuses = ['fullyBilled', 'partiallyFulfilled', 'fulfilled', 'billed'];
+
+    const isExist = statuses.filter((stat) => stat === itemDetails?.status);
+    if (isExist.length === 0) {
       return true;
     }
     return false;
