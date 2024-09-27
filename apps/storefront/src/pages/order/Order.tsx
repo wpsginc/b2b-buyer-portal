@@ -361,7 +361,7 @@ function Order({ isCompanyOrder = false }: OrderProps) {
           </Box>
         </B3Spin>
       ) : (
-        <NetsuiteOrders />
+        <NetsuiteOrders companyId={companyB2BId} />
       )}
     </Box>
   );
