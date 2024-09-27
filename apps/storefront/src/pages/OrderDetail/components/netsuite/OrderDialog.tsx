@@ -52,9 +52,8 @@ export default function OrderDialog({
   const [checkedArr, setCheckedArr] = useState<number[]>([]);
   const [returnArr, setReturnArr] = useState<ReturnListProps[]>([]);
   const customerId = useAppSelector(({ company }) => company.customer.id);
-
   const [returnFormFields] = useState(getReturnFormFields());
-
+  const companyId = useAppSelector(({ company }) => company?.companyInfo?.id);
   const [isMobile] = useMobile();
 
   const {
@@ -89,7 +88,7 @@ export default function OrderDialog({
       const data = [
         {
           order_id: orderId,
-          customer_id: customerId,
+          customer_id: companyId || customerId,
           return_reason: returnReason?.return_reason,
           line_items: returnArr,
         },
