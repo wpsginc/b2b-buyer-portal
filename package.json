@@ -1,6 +1,6 @@
 {
   "name": "b2b-buyer-portal",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "private": true,
   "license": "MIT",
   "workspaces": [
