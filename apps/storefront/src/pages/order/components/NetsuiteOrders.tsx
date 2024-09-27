@@ -78,13 +78,15 @@ function EnhancedTableHead() {
   );
 }
 
-export default function NetsuiteOrders() {
+export default function NetsuiteOrders(companyId: any) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [allTotal, setAllTotal] = useState(0);
   const [allOrders, setAllOrders] = useState([]);
   const [isRequestLoading, setIsRequestLoading] = useState(true);
   const customerId = useAppSelector(({ company }) => company.customer.id);
+
+  const compID = companyId?.companyId;
 
   const navigate = useNavigate();
   const [isMobile] = useMobile();
@@ -94,7 +96,7 @@ export default function NetsuiteOrders() {
       const data = [
         {
           order_id: 0,
-          customer_id: customerId.toString(),
+          customer_id: compID || customerId.toString(),
           return_reason: [],
           line_items: [],
         },
