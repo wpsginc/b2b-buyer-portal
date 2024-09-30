@@ -141,9 +141,11 @@ function OrderDetail() {
             const req = getNSReturnDetails(data);
             const nsDetails = await req;
             const orderStat = nsDetails?.status;
+            const orderNum = nsDetails?.orderNumber;
 
             setNsStatus(orderStat);
             setNSItemDetails(nsDetails);
+            setOrderId(orderNum);
           } catch (err) {
             if (err === 'order does not exist') {
               setTimeout(() => {
@@ -159,6 +161,7 @@ function OrderDetail() {
       } else {
         const getOrderDetails = async () => {
           const id = parseInt(orderId, 10);
+
           if (!id) {
             return;
           }
