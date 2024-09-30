@@ -95,7 +95,9 @@ export default function OrderAction(nsItemDetails: any) {
     // Allowed statuses, Partially Fullfilled / Fulfilled / Billed / Fully Billed
     const statuses = ['fullyBilled', 'partiallyFulfilled', 'fulfilled', 'billed'];
 
-    const isExist = statuses.filter((stat) => stat === itemDetails?.status);
+    const isExist = statuses.filter(
+      (stat) => stat.toLowerCase() === itemDetails?.status.toLowerCase(),
+    );
     if (isExist.length === 0) {
       return true;
     }

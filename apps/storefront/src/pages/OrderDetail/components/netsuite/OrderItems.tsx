@@ -103,7 +103,7 @@ const statusNotes = (status: string) => {
   // Allowed statuses, Partially Fullfilled / Fulfilled / Billed / Fully Billed
   const statuses = ['fullyBilled', 'partiallyFulfilled', 'fulfilled', 'billed'];
 
-  const isExist = statuses.filter((stat) => stat === status);
+  const isExist = statuses.filter((stat) => stat.toLowerCase() === status.toLowerCase());
   if (isExist.length === 0) statusText = status;
   return statusText;
 };
