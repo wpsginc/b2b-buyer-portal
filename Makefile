@@ -13,3 +13,4 @@ build-staging:
 
 # check package json version
 # check env same version in package json
+# then yarn build
