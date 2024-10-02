@@ -31,6 +31,7 @@ import { type PageProps } from '../PageProps';
 
 import LoginWidget from './component/LoginWidget';
 import { loginCheckout, LoginConfig } from './config';
+import LoginExistingUser from './LoginExistingUser';
 import LoginForm from './LoginForm';
 import LoginPanel from './LoginPanel';
 import { LoginContainer, LoginImage } from './styled';
@@ -380,6 +381,7 @@ export default function Login(props: PageProps) {
                     html={loginInfo.widgetHeadText}
                   />
                 )}
+                <LoginExistingUser />
                 <Box
                   sx={{
                     display: 'flex',
