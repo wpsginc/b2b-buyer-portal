@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FieldValues, useForm } from 'react-hook-form';
+import { useLocation } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
 import { Box, Typography } from '@mui/material';
 
@@ -38,6 +39,10 @@ interface OrderDialogProps {
   orderId: number;
 }
 
+interface LocationState {
+  isCompanyOrder: boolean;
+}
+
 export default function OrderDialog({
   open,
   products = [],
@@ -55,6 +60,10 @@ export default function OrderDialog({
   const [returnFormFields] = useState(getReturnFormFields());
   const companyId = useAppSelector(({ company }) => company?.companyInfo?.id);
   const [isMobile] = useMobile();
+  const location = useLocation();
+
+  const isCompanyOrder = !!(location.state as LocationState).isCompanyOrder;
+  const customer_company_id = isCompanyOrder && isB2BUser && companyId ? companyId : customerId;
 
   const {
     control,
@@ -88,7 +97,7 @@ export default function OrderDialog({
       const data = [
         {
           order_id: orderId,
-          customer_id: companyId || customerId,
+          customer_id: customer_company_id,
           return_reason: returnReason?.return_reason,
           line_items: returnArr,
         },
