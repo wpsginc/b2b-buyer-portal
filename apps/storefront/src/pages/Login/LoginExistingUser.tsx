@@ -1,5 +1,5 @@
 import InfoIcon from '@mui/icons-material/Info';
-import { Box, List, ListItem, Typography } from '@mui/material';
+import { Box, Link, List, ListItem, Typography } from '@mui/material';
 
 export default function LoginExistingUser() {
   return (
@@ -43,6 +43,22 @@ export default function LoginExistingUser() {
           </List>
           After resetting, you will receive an email with a link to set your new password.
           <br />
+          <Typography sx={{ paddingTop: '10px', paddingBottom: '10px' }}>
+            If you encounter issues receiving the reset password link:
+            <List sx={{ listStyle: 'decimal', ml: '40px' }}>
+              <ListItem sx={{ display: 'list-item', p: '0' }}>
+                <strong>Check your spam folder</strong> for the reset password email.
+              </ListItem>
+              <ListItem sx={{ display: 'list-item', p: '0' }}>
+                <strong>Click &quot;Create Account&quot;</strong> to register the same email address
+                previously used for your online account.
+              </ListItem>
+            </List>
+            We have implemented a migration process to transfer active online accounts. If the
+            &quot;Reset Password&quot; link is not working, please click &quot;Create Account&quot;
+            to regain access. For further assistance, contact{' '}
+            <Link href="mailto:customerservice@wpsginc.com">Customer Service</Link>.
+          </Typography>
           We apologize for any inconvenience this may cause and appreciate your understanding.
         </Typography>
       </Box>
