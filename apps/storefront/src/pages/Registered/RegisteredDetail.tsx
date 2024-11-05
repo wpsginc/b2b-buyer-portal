@@ -78,6 +78,11 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         info.pattern = '[0-9]*';
       }
 
+      if (customFieldsInfo.fieldId === 'field_company_email' && accountType === '1') {
+        info.isTip = true;
+        info.tipText = `Please enter a valid email `;
+      }
+
       return customFieldsInfo;
     },
   );
@@ -233,12 +238,41 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         (item: CustomFieldItems) => item.fieldId === 'field_company_phone_number',
       )?.name || 'phone';
 
+    const companyEmail =
+      companyInformation?.find((item: CustomFieldItems) => item.fieldId === 'field_company_email')
+        ?.name || 'email';
+
+    const addressPhone =
+      addressBasicList?.find((item: CustomFieldItems) => item.label.includes('Phone Number'))
+        ?.name || 'phone';
+
     handleSubmit(async (data: CustomFieldItems) => {
       if (hasAttachmentsFilesError) return;
       showLoading(true);
 
+      if (data[companyEmail]) {
+        const regex = /^([a-zA-Z0-9_.+-])+@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+        if (!regex.test(data[companyEmail])) {
+          setError(companyEmail, {
+            type: 'custom',
+            message: 'Please use a valid email address, such as user@example.com.',
+          });
+          showLoading(false);
+          return;
+        }
+      }
+
       if (data[phoneNumber]?.length > 10 || data[phoneNumber]?.length < 10) {
         setError(phoneNumber, {
+          type: 'custom',
+          message: 'Please enter a valid phone number',
+        });
+        showLoading(false);
+        return;
+      }
+
+      if (data[addressPhone]?.length > 10 || data[addressPhone]?.length < 10) {
+        setError(addressPhone, {
           type: 'custom',
           message: 'Please enter a valid phone number',
         });
