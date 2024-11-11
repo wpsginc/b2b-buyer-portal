@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CallbackKey, useCallbacks } from '@b3/hooks';
+import { B2BEvent, useB2BCallback } from '@b3/hooks';
 import { useB3Lang } from '@b3/lang';
 import { ArrowBackIosNew } from '@mui/icons-material';
 import { Box, Checkbox, FormControlLabel, Stack, Typography } from '@mui/material';
@@ -33,7 +33,7 @@ import {
 import { AddressItemType, BCAddressItemType } from '@/types/address';
 import { BillingAddress, ContactInfoKeys, ShippingAddress } from '@/types/quotes';
 import { B3LStorage, channelId, snackbar, storeHash } from '@/utils';
-import { addQuoteDraftProducts } from '@/utils/b3Product/b3Product';
+import { addQuoteDraftProducts, getVariantInfoOOSAndPurchase } from '@/utils/b3Product/b3Product';
 import { deleteCartData } from '@/utils/cartUtils';
 import validateObject from '@/utils/quoteUtils';
 
@@ -47,6 +47,7 @@ import QuoteAttachment from '../quote/components/QuoteAttachment';
 import QuoteInfo from '../quote/components/QuoteInfo';
 import QuoteNote from '../quote/components/QuoteNote';
 import QuoteStatus from '../quote/components/QuoteStatus';
+import QuoteSubmissionResponse from '../quote/components/QuoteSubmissionResponse';
 import QuoteSummary from '../quote/components/QuoteSummary';
 import QuoteTable from '../quote/components/QuoteTable';
 import getAccountFormFields from '../quote/config';
@@ -126,6 +127,13 @@ function QuoteDraft({ setOpenPage }: PageProps) {
   const quoteinfo = useAppSelector(({ quoteInfo }) => quoteInfo.draftQuoteInfo);
   const currency = useAppSelector(activeCurrencyInfoSelector);
   const b2bPermissions = useAppSelector(rolePermissionSelector);
+  const quoteSubmissionResponseInfo = useAppSelector(
+    ({ global }) => global.quoteSubmissionResponse,
+  );
+
+  const isEnableProduct = useAppSelector(
+    ({ global }) => global.blockPendingQuoteNonPurchasableOOS.isEnableProduct,
+  );
 
   const {
     state: {
@@ -149,6 +157,10 @@ function QuoteDraft({ setOpenPage }: PageProps) {
 
   const [shippingSameAsBilling, setShippingSameAsBilling] = useState<boolean>(false);
   const [billingChange, setBillingChange] = useState<boolean>(false);
+  const [quoteSubmissionResponseOpen, setQuoteSubmissionResponseOpen] = useState<boolean>(false);
+  const [quoteId, setQuoteId] = useState<string | number>('');
+  const [currentCreatedAt, setCurrentCreatedAt] = useState<string | number>('');
+
   const quoteSummaryRef = useRef<QuoteSummaryRef | null>(null);
 
   useSetCountry();
@@ -331,188 +343,230 @@ function QuoteDraft({ setOpenPage }: PageProps) {
     }));
   };
 
-  const handleSubmit = useCallbacks(CallbackKey.OnQuoteCreate, async (_e, handleEvent) => {
-    setLoading(true);
-    try {
-      const info = cloneDeep(quoteinfo);
-      const contactInfo = info?.contactInfo || {};
+  const handleReset = () => {
+    dispatch(resetDraftQuoteInfo());
+    dispatch(resetDraftQuoteList());
+    B3LStorage.delete('cartToQuoteId');
+  };
 
-      const quoteTitle = contactInfo?.quoteTitle || '';
+  const handleAfterSubmit = (
+    inpQuoteId?: string | number,
+    inpCurrentCreatedAt?: string | number,
+  ) => {
+    const currentQuoteId = inpQuoteId || quoteId;
+    const createdAt = inpCurrentCreatedAt || currentCreatedAt;
 
-      if ('quoteTitle' in contactInfo) delete contactInfo.quoteTitle;
-
-      const isComplete = Object.keys(contactInfo).every((key: string) => {
-        if (key === 'phoneNumber' || key === 'companyName') {
-          return true;
-        }
-
-        return contactInfo && !!contactInfo[key as ContactInfoKeys];
-      });
-
-      if (validateObject(quoteinfo, 'contactInfo') || !isComplete) {
-        snackbar.error(b3Lang('quoteDraft.addQuoteInfo'));
-        return;
-      }
-
-      if (!draftQuoteList || draftQuoteList.length === 0) {
-        snackbar.error(b3Lang('quoteDraft.submit'));
-        return;
-      }
-
-      const note = info?.note || '';
-      const newNote = note.trim().replace(/[\r\n]/g, '\\n');
-
-      const perfectAddress = (address: ShippingAddress | BillingAddress) => {
-        const newAddress = cloneDeep(address);
-
-        const countryItem = countriesList?.find(
-          (item: Country) => item.countryCode === newAddress.country,
-        );
-
-        if (countryItem) {
-          newAddress.country = countryItem.countryName;
-        }
-
-        newAddress.address = address?.address || '';
-        newAddress.apartment = address?.apartment || '';
-
-        return newAddress;
-      };
-
-      const { shippingAddress: editShippingAddress, billingAddress: editBillingAddress } =
-        billingRef?.current ? getAddress() : info;
-
-      const shippingAddress = editShippingAddress ? perfectAddress(editShippingAddress) : {};
-
-      const billingAddress = editBillingAddress ? perfectAddress(editBillingAddress) : {};
-
-      let allPrice = 0;
-      let allTaxPrice = 0;
-
-      const calculationTime = (value: string | number) => {
-        if (typeof value === 'string' && value.includes('-')) {
-          return `${new Date(value).getTime() / 1000}`;
-        }
-        return value;
-      };
-
-      const productList = draftQuoteList.map((item) => {
-        const { node } = item;
-        const product = {
-          ...node.productsSearch,
-          selectOptions: node?.optionList || '',
-        };
-
-        const productFields = getProductOptionsFields(product, {});
-        const optionsList =
-          productFields
-            .map((item) => ({
-              optionId: item.optionId,
-              optionValue:
-                item.fieldType === 'date' ? calculationTime(item.optionValue) : item.optionValue,
-              optionLabel: `${item.valueText}`,
-              optionName: item.valueLabel,
-              type: item?.fieldOriginType || item.fieldType,
-            }))
-            .filter((list: CustomFieldItems) => !!list.optionName) || [];
-
-        const variants = node?.productsSearch?.variants;
-        let varantsItem;
-        if (Array.isArray(variants)) {
-          varantsItem = variants.find((item) => item.sku === node.variantSku);
-        }
-
-        allPrice += +(node?.basePrice || 0) * +(node?.quantity || 0);
-
-        allTaxPrice += +(node?.taxPrice || 0) * +(node?.quantity || 0);
-
-        const items = {
-          productId: node?.productsSearch?.id,
-          sku: node.variantSku,
-          basePrice: (+(node?.basePrice || 0)).toFixed(currency.decimal_places),
-          discount: '0.00',
-          offeredPrice: (+(node?.basePrice || 0)).toFixed(currency.decimal_places),
-          quantity: node.quantity,
-          variantId: varantsItem?.variant_id,
-          imageUrl: node.primaryImage,
-          productName: node.productName,
-          options: optionsList,
-        };
-
-        return items;
-      });
-
-      const fileList = getFileList(quoteinfo?.fileInfo || []);
-
-      const data = {
-        message: newNote,
-        legalTerms: '',
-        totalAmount: enteredInclusiveTax
-          ? allPrice.toFixed(currency.decimal_places)
-          : (allPrice + allTaxPrice).toFixed(currency.decimal_places),
-        grandTotal: allPrice.toFixed(currency.decimal_places),
-        subtotal: allPrice.toFixed(currency.decimal_places),
-        companyId: isB2BUser ? companyB2BId || salesRepCompanyId : '',
-        storeHash,
-        quoteTitle,
-        discount: '0.00',
-        channelId,
-        userEmail: customer.emailAddress,
-        shippingAddress,
-        billingAddress,
-        contactInfo,
-        productList,
-        fileList,
-        taxTotal: allTaxPrice.toFixed(currency.decimal_places),
-        currency: {
-          currencyExchangeRate: currency.currency_exchange_rate,
-          token: currency.token,
-          location: currency.token_location,
-          decimalToken: currency.decimal_token,
-          decimalPlaces: currency.decimal_places,
-          thousandsToken: currency.thousands_token,
-          currencyCode: currency.currency_code,
-        },
-      };
-
-      const fn = +role === 99 ? createBCQuote : createQuote;
-
-      if (!handleEvent(data)) {
-        throw new Error();
-      }
-
-      const {
-        quoteCreate: {
-          quote: { id, createdAt },
-        },
-      } = await fn(data);
-
-      if (id) {
-        const cartId = B3LStorage.get('cartToQuoteId');
-        const deleteCartObject = deleteCartData(cartId);
-
-        await deleteCart(deleteCartObject);
-      }
-
-      navigate(`/quoteDetail/${id}?date=${createdAt}`, {
+    if (currentQuoteId) {
+      handleReset();
+      navigate(`/quoteDetail/${currentQuoteId}?date=${createdAt}`, {
         state: {
           to: 'draft',
         },
       });
-
-      dispatch(resetDraftQuoteInfo());
-      dispatch(resetDraftQuoteList());
-      B3LStorage.delete('cartToQuoteId');
-    } catch (error: any) {
-      if (error.message && error.message.length > 0) {
-        snackbar.error(error.message, {
-          isClose: true,
-        });
-      }
-    } finally {
-      setLoading(false);
     }
-  });
+  };
+
+  const handleSubmit = useB2BCallback(
+    B2BEvent.OnQuoteCreate,
+    async (dispatchOnQuoteCreateEvent) => {
+      setLoading(true);
+      try {
+        const info = cloneDeep(quoteinfo);
+        const contactInfo = info?.contactInfo || {};
+
+        const quoteTitle = contactInfo?.quoteTitle || '';
+
+        if ('quoteTitle' in contactInfo) delete contactInfo.quoteTitle;
+
+        const isComplete = Object.keys(contactInfo).every((key: string) => {
+          if (key === 'phoneNumber' || key === 'companyName') {
+            return true;
+          }
+
+          return contactInfo && !!contactInfo[key as ContactInfoKeys];
+        });
+
+        if (validateObject(quoteinfo, 'contactInfo') || !isComplete) {
+          snackbar.error(b3Lang('quoteDraft.addQuoteInfo'));
+          return;
+        }
+
+        if (!draftQuoteList || draftQuoteList.length === 0) {
+          snackbar.error(b3Lang('quoteDraft.submit'));
+          return;
+        }
+
+        if (!isEnableProduct) {
+          const itHasInvalidProduct = draftQuoteList.some((item) => {
+            return getVariantInfoOOSAndPurchase(item)?.name;
+          });
+
+          if (itHasInvalidProduct) {
+            snackbar.error(b3Lang('quoteDraft.submit.errorTip'));
+            return;
+          }
+        }
+
+        const note = info?.note || '';
+        const newNote = note.trim().replace(/[\r\n]/g, '\\n');
+
+        const perfectAddress = (address: ShippingAddress | BillingAddress) => {
+          const newAddress = cloneDeep(address);
+
+          const countryItem = countriesList?.find(
+            (item: Country) => item.countryCode === newAddress.country,
+          );
+
+          if (countryItem) {
+            newAddress.country = countryItem.countryName;
+          }
+
+          newAddress.address = address?.address || '';
+          newAddress.apartment = address?.apartment || '';
+
+          return newAddress;
+        };
+
+        const { shippingAddress: editShippingAddress, billingAddress: editBillingAddress } =
+          billingRef?.current ? getAddress() : info;
+
+        const shippingAddress = editShippingAddress ? perfectAddress(editShippingAddress) : {};
+
+        const billingAddress = editBillingAddress ? perfectAddress(editBillingAddress) : {};
+
+        let allPrice = 0;
+        let allTaxPrice = 0;
+
+        const calculationTime = (value: string | number) => {
+          if (typeof value === 'string' && value.includes('-')) {
+            return `${new Date(value).getTime() / 1000}`;
+          }
+          return value;
+        };
+
+        const productList = draftQuoteList.map((item) => {
+          const { node } = item;
+          const product = {
+            ...node.productsSearch,
+            selectOptions: node?.optionList || '',
+          };
+
+          const productFields = getProductOptionsFields(product, {});
+          const optionsList =
+            productFields
+              .map((item) => ({
+                optionId: item.optionId,
+                optionValue:
+                  item.fieldType === 'date' ? calculationTime(item.optionValue) : item.optionValue,
+                optionLabel: `${item.valueText}`,
+                optionName: item.valueLabel,
+                type: item?.fieldOriginType || item.fieldType,
+              }))
+              .filter((list: CustomFieldItems) => !!list.optionName) || [];
+
+          const variants = node?.productsSearch?.variants;
+          let varantsItem;
+          if (Array.isArray(variants)) {
+            varantsItem = variants.find((item) => item.sku === node.variantSku);
+          }
+
+          allPrice += +(node?.basePrice || 0) * +(node?.quantity || 0);
+
+          allTaxPrice += +(node?.taxPrice || 0) * +(node?.quantity || 0);
+
+          const items = {
+            productId: node?.productsSearch?.id,
+            sku: node.variantSku,
+            basePrice: (+(node?.basePrice || 0)).toFixed(currency.decimal_places),
+            discount: '0.00',
+            offeredPrice: (+(node?.basePrice || 0)).toFixed(currency.decimal_places),
+            quantity: node.quantity,
+            variantId: varantsItem?.variant_id,
+            imageUrl: node.primaryImage,
+            productName: node.productName,
+            options: optionsList,
+          };
+
+          return items;
+        });
+
+        const fileList = getFileList(quoteinfo?.fileInfo || []);
+
+        const data = {
+          message: newNote,
+          legalTerms: '',
+          totalAmount: enteredInclusiveTax
+            ? allPrice.toFixed(currency.decimal_places)
+            : (allPrice + allTaxPrice).toFixed(currency.decimal_places),
+          grandTotal: allPrice.toFixed(currency.decimal_places),
+          subtotal: allPrice.toFixed(currency.decimal_places),
+          companyId: isB2BUser ? companyB2BId || salesRepCompanyId : '',
+          storeHash,
+          quoteTitle,
+          discount: '0.00',
+          channelId,
+          userEmail: customer.emailAddress,
+          shippingAddress,
+          billingAddress,
+          contactInfo,
+          productList,
+          fileList,
+          taxTotal: allTaxPrice.toFixed(currency.decimal_places),
+          currency: {
+            currencyExchangeRate: currency.currency_exchange_rate,
+            token: currency.token,
+            location: currency.token_location,
+            decimalToken: currency.decimal_token,
+            decimalPlaces: currency.decimal_places,
+            thousandsToken: currency.thousands_token,
+            currencyCode: currency.currency_code,
+          },
+        };
+
+        const fn = +role === 99 ? createBCQuote : createQuote;
+
+        if (!dispatchOnQuoteCreateEvent(data)) {
+          throw new Error();
+        }
+
+        const {
+          quoteCreate: {
+            quote: { id, createdAt },
+          },
+        } = await fn(data);
+
+        setQuoteId(id);
+        setCurrentCreatedAt(createdAt);
+
+        if (id) {
+          const cartId = B3LStorage.get('cartToQuoteId');
+          const deleteCartObject = deleteCartData(cartId);
+
+          await deleteCart(deleteCartObject);
+        }
+
+        if (quoteSubmissionResponseInfo.value === '0') {
+          handleAfterSubmit(id, createdAt);
+        } else {
+          setQuoteSubmissionResponseOpen(true);
+        }
+      } catch (error: any) {
+        if (error.message && error.message.length > 0) {
+          snackbar.error(error.message, {
+            isClose: true,
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+  );
+
+  const handleCloseQuoteSubmissionResponse = () => {
+    setQuoteSubmissionResponseOpen(false);
+
+    handleAfterSubmit();
+  };
 
   const backText = () => {
     let text =
@@ -804,6 +858,12 @@ function QuoteDraft({ setOpenPage }: PageProps) {
           </Container>
         </Box>
       </Box>
+
+      <QuoteSubmissionResponse
+        isOpen={quoteSubmissionResponseOpen}
+        onClose={handleCloseQuoteSubmissionResponse}
+        quoteSubmissionResponseInfo={quoteSubmissionResponseInfo}
+      />
     </B3Spin>
   );
 }

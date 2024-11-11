@@ -1,4 +1,4 @@
-import { Fragment, ReactNode, useContext, useState } from 'react';
+import { Fragment, ReactNode, useCallback, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
 import styled from '@emotion/styled';
@@ -44,11 +44,11 @@ interface ItemContainerProps {
 const ItemContainer = styled('div')((props: ItemContainerProps) => ({
   display: 'flex',
   justifyContent: 'space-between',
-  fontWeight: props.nameKey === 'Grand total' ? 700 : 400,
+  fontWeight: props.nameKey === 'grandTotal' ? 700 : 400,
 
   '& p': {
     marginTop: 0,
-    marginBottom: props.nameKey === 'Grand total' ? '0' : '12px',
+    marginBottom: props.nameKey === 'grandTotal' ? '0' : '12px',
     lineHeight: 1,
   },
 }));
@@ -64,6 +64,9 @@ interface Infos {
     [k: string]: string;
   };
   money?: MoneyFormat;
+  symbol?: {
+    [k: string]: string;
+  };
 }
 
 interface Buttons {
@@ -178,9 +181,10 @@ function OrderCard(props: OrderCardProps) {
   if (typeof infos === 'string') {
     showedInformation = infos;
   } else if (infos?.money) {
+    const symbol = infos?.symbol || {};
     showedInformation = infoKey?.map((key: string, index: number) => (
       <Fragment key={key}>
-        {key === 'Grand total' && (
+        {symbol[key] === 'grandTotal' && (
           <Divider
             sx={{
               marginBottom: '1rem',
@@ -189,13 +193,21 @@ function OrderCard(props: OrderCardProps) {
           />
         )}
 
-        <ItemContainer key={key} nameKey={key}>
-          <p>{key}</p>
-          <p>
-            {infos?.money
-              ? `${ordersCurrencyFormat(infos.money, infoValue[index])}`
-              : currencyFormat(infoValue[index])}
-          </p>
+        <ItemContainer key={key} nameKey={symbol[key]}>
+          <p id="item-name-key">{key}</p>
+          {symbol[key] === 'coupon' ? (
+            <p>
+              {infos?.money
+                ? `-${ordersCurrencyFormat(infos.money, infoValue[index])}`
+                : `-${currencyFormat(infoValue[index])}`}
+            </p>
+          ) : (
+            <p>
+              {infos?.money
+                ? `${ordersCurrencyFormat(infos.money, infoValue[index])}`
+                : currencyFormat(infoValue[index])}
+            </p>
+          )}
         </ItemContainer>
       </Fragment>
     ));
@@ -216,7 +228,16 @@ function OrderCard(props: OrderCardProps) {
         {subtitle && <div>{subtitle}</div>}
       </Box>
       <CardContent>
-        <Box>{showedInformation}</Box>
+        <Box
+          sx={{
+            '& #item-name-key': {
+              maxWidth: '70%',
+              wordBreak: 'break-word',
+            },
+          }}
+        >
+          {showedInformation}
+        </Box>
       </CardContent>
       <StyledCardActions isShowButtons={isShowButtons}>
         {buttons &&
@@ -278,14 +299,32 @@ export default function OrderAction(props: OrderActionProps) {
 
   const {
     money,
-    orderSummary: { createAt, name, priceData } = {},
+    orderSummary: { createAt, name, priceData, priceSymbol } = {},
     payment: { billingAddress, paymentMethod, dateCreateAt } = {},
     orderComments = '',
     products,
     orderId,
     ipStatus = 0,
     invoiceId,
+    poNumber,
   } = detailsData;
+
+  const getPaymentMessage = useCallback(() => {
+    let message = '';
+
+    if (!createAt) return message;
+
+    if (poNumber) {
+      message = b3Lang('orderDetail.paidWithPo', {
+        paidDate: displayFormat(createAt, true),
+      });
+    } else {
+      message = b3Lang('orderDetail.paidInFull', {
+        paidDate: displayFormat(createAt, true),
+      });
+    }
+    return message;
+  }, [poNumber, createAt, b3Lang]);
 
   if (!orderId) {
     return null;
@@ -386,6 +425,9 @@ export default function OrderAction(props: OrderActionProps) {
       // isCanShow: isB2BUser ? shoppingListActionsPermission : true,
       // hidden as of 08/10/24 until this function is needed
       isCanShow: false,
+      // isCanShow: isB2BUser
+      //   ? shoppingListActionsPermission && shoppingListEnabled
+      //   : shoppingListEnabled,
     },
   ];
 
@@ -405,16 +447,13 @@ export default function OrderAction(props: OrderActionProps) {
       infos: {
         money,
         info: priceData || {},
+        symbol: priceSymbol || {},
       },
     },
     {
       header: b3Lang('orderDetail.payment'),
       key: 'payment',
-      subtitle: createAt
-        ? b3Lang('orderDetail.paidInFull', {
-            paidDate: displayFormat(createAt, true),
-          })
-        : '',
+      subtitle: getPaymentMessage(),
       buttons: [
         {
           value: isB2BUser ? b3Lang('orderDetail.viewInvoice') : b3Lang('orderDetail.printInvoice'),

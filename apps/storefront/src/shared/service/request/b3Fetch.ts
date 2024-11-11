@@ -141,7 +141,9 @@ Request to B2B graphql API using B2B token
       const extensions = error?.extensions;
 
       if (extensions?.code === 40101) {
-        window.location.href = '#/login?loginFlag=3&showTip=false';
+        if (window.location.hash.startsWith('#/')) {
+          window.location.href = '#/login?loginFlag=3&showTip=false';
+        }
 
         if (message) {
           snackbar.error(message);

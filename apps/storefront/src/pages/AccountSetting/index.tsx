@@ -13,25 +13,22 @@ import { useMobile } from '@/hooks';
 import useStorageState from '@/hooks/useStorageState';
 import { CustomStyleContext } from '@/shared/customStyleButton';
 import {
+  checkUserBCEmail,
+  checkUserEmail,
   getB2BAccountFormFields,
   getB2BAccountSettings,
   getBCAccountSettings,
   updateB2BAccountSettings,
   updateBCAccountSettings,
 } from '@/shared/service/b2b';
-import { isB2BUserSelector, isValidUserTypeSelector, useAppSelector } from '@/store';
+import { isB2BUserSelector, useAppSelector } from '@/store';
 import { Fields, ParamProps } from '@/types/accountSetting';
-import { B3SStorage, snackbar } from '@/utils';
+import { B3SStorage, channelId, snackbar } from '@/utils';
 
 import { deCodeField, getAccountFormFields } from '../Registered/config';
 
 import { getAccountSettingFiles } from './config';
-import sendEmail, {
-  b2bSubmitDataProcessing,
-  bcSubmitDataProcessing,
-  initB2BInfo,
-  initBcInfo,
-} from './utils';
+import { b2bSubmitDataProcessing, bcSubmitDataProcessing, initB2BInfo, initBcInfo } from './utils';
 
 function AccountSetting() {
   const {
@@ -54,7 +51,6 @@ function AccountSetting() {
   const companyInfoId = useAppSelector(({ company }) => company.companyInfo.id);
   const customer = useAppSelector(({ company }) => company.customer);
   const role = useAppSelector(({ company }) => company.customer.role);
-  const isValidUserType = useAppSelector(isValidUserTypeSelector);
   const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
 
@@ -81,8 +77,6 @@ function AccountSetting() {
   const [accountSettings, setAccountSettings] = useState<any>({});
 
   const [isVisible, setIsVisible] = useState<boolean>(false);
-
-  const [currentEamil, setCurrentEmail] = useState<string>('');
 
   const companyId = role === 3 && isAgenting ? salesRepCompanyId : +companyInfoId;
 
@@ -164,8 +158,6 @@ function AccountSetting() {
 
         setAccountInfoFormFields(all);
 
-        setCurrentEmail(accountSettings.email);
-
         setAccountSettings(accountSettings);
 
         setDecryptionFields(contactInformation);
@@ -188,15 +180,23 @@ function AccountSetting() {
 
   const validateEmailValue = async (emailValue: string) => {
     if (customer.emailAddress === trim(emailValue)) return true;
+    const payload = {
+      email: emailValue,
+      channelId,
+    };
 
-    if (!isValidUserType) {
+    const { isValid }: CustomFieldItems = isBCUser
+      ? await checkUserBCEmail(payload)
+      : await checkUserEmail(payload);
+
+    if (!isValid) {
       setError('email', {
         type: 'custom',
         message: b3Lang('accountSettings.notification.emailExists'),
       });
     }
 
-    return isValidUserType;
+    return isValid;
   };
 
   const passwordValidation = (data: Partial<ParamProps>) => {
@@ -243,7 +243,7 @@ function AccountSetting() {
       setLoadding(true);
 
       try {
-        const isValid = !isBCUser ? await validateEmailValue(data.email) : true;
+        const isValid = await validateEmailValue(data.email);
 
         const emailFlag = emailValidation(data);
 
@@ -272,19 +272,15 @@ function AccountSetting() {
 
             const requestFn = !isBCUser ? updateB2BAccountSettings : updateBCAccountSettings;
 
-            if ((param.newPassword && param.currentPassword) || currentEamil !== param.email) {
-              const isUpdateSuccessfully = await sendEmail(param, extraFields);
-              if (!isUpdateSuccessfully) {
-                snackbar.error(b3Lang('accountSettings.notification.passwordNotMatch'));
-                return;
-              }
-            }
-            const newParams = {
+            const newParams: CustomFieldItems = {
               ...param,
-              newPassword: param.newPassword,
-              currentPassword: param.newPassword,
-              confirmPassword: param.newPassword,
+              currentPassword: param.currentPassword,
             };
+
+            if (param.newPassword === '' && param.confirmPassword === '') {
+              delete newParams.newPassword;
+              delete newParams.confirmPassword;
+            }
             await requestFn(newParams);
           } else {
             snackbar.success(b3Lang('accountSettings.notification.noEdits'));

@@ -111,8 +111,9 @@ export const getloginTokenInfo = () => {
 
 export const loginInfo = async () => {
   const loginTokenInfo = getloginTokenInfo();
+
   const {
-    data: { token },
+    storeFrontToken: { token },
   } = await getBCGraphqlToken(loginTokenInfo);
 
   store.dispatch(setbcGraphqlToken(token));
@@ -128,7 +129,6 @@ export const clearCurrentCustomerInfo = async () => {
   B3SStorage.set('blockPendingAccountOrderCreation', false);
   B3SStorage.set('loginCustomer', '');
   sessionStorage.removeItem('b2b-blockPendingAccountOrderCreation');
-
   store.dispatch(clearCompanySlice());
   store.dispatch(clearMasqueradeCompany());
 };
@@ -208,22 +208,22 @@ export const agentInfo = async (customerId: number | string, role: number) => {
   }
 };
 
-export const getCompanyUserInfo = async (emailAddress: string, customerId: string | number) => {
+export const getCompanyUserInfo = async () => {
   try {
-    if (!emailAddress || !customerId) return undefined;
-
     const {
-      companyUserInfo: {
+      customerInfo: {
         userType,
         userInfo: { role = '', id, companyRoleName = '' },
+        permissions,
       },
-    } = await getB2BCompanyUserInfo(emailAddress, customerId);
+    } = await getB2BCompanyUserInfo();
 
     return {
       userType,
       role,
       id,
       companyRoleName,
+      permissions,
     };
   } catch (error) {
     b2bLogger.error(error);
@@ -241,7 +241,11 @@ const loginWithCurrentCustomerJWT = async () => {
     return undefined;
   }
 
-  if (currentCustomerJWT?.includes('errors') || prevCurrentCustomerJWT === currentCustomerJWT)
+  if (
+    !currentCustomerJWT ||
+    currentCustomerJWT?.includes('errors') ||
+    prevCurrentCustomerJWT === currentCustomerJWT
+  )
     return undefined;
 
   const data = await getB2BToken(currentCustomerJWT, channelId);
@@ -289,10 +293,10 @@ export const getCurrentCustomerInfo: (b2bToken?: string) => Promise<
       customerGroupId,
     } = loginCustomer;
 
-    const companyUserInfo = await getCompanyUserInfo(emailAddress, customerId);
+    const companyUserInfo = await getCompanyUserInfo();
 
     if (companyUserInfo && customerId) {
-      const { userType, role, id, companyRoleName } = companyUserInfo;
+      const { userType, role, id, companyRoleName, permissions } = companyUserInfo;
 
       const [companyInfo] = await Promise.all([
         getCompanyInfo(role, id, userType),
@@ -327,6 +331,7 @@ export const getCurrentCustomerInfo: (b2bToken?: string) => Promise<
       store.dispatch(resetDraftQuoteList());
       store.dispatch(resetDraftQuoteInfo());
       store.dispatch(clearMasqueradeCompany());
+      store.dispatch(setPermissionModules(permissions));
       store.dispatch(setCompanyInfo(companyPayload));
       store.dispatch(setCustomerInfo(customerInfo));
       store.dispatch(setQuoteUserId(quoteUserId));

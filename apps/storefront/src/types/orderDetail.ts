@@ -64,6 +64,8 @@ export interface OrderProductItem {
   wrapping_name: string;
   current_quantity_shipped?: number;
   not_shipping_number?: number;
+  variantImageUrl?: string;
+  isVisible?: boolean;
 }
 
 export interface EditableProductItem extends OrderProductItem {
@@ -186,6 +188,16 @@ export interface OrderBillings {
   products: OrderProductItem[];
 }
 
+export interface CouponsInfo {
+  amount: string;
+  code: string;
+  coupon_id: number;
+  discount: string;
+  id: number;
+  order_id: number;
+  type: number;
+}
+
 export interface B2BOrderData {
   baseHandlingCost: string;
   baseShippingCost: string;
@@ -196,6 +208,7 @@ export interface B2BOrderData {
   channelId: string;
   companyName: string | null;
   couponDiscount: string;
+  coupons: CouponsInfo[];
   createdEmail: string;
   creditCardType: string | null;
   currencyCode: string;
@@ -271,6 +284,9 @@ export interface OrderSummary {
   createAt: string;
   name: string;
   priceData: {
+    [k: string]: string;
+  };
+  priceSymbol: {
     [k: string]: string;
   };
 }

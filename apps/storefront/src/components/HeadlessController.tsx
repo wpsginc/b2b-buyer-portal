@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef } from 'react';
 import { useB3Lang } from '@b3/lang';
+import Cookies from 'js-cookie';
 
 import { HeadlessRoutes } from '@/constants';
 import { addProductFromPage as addProductFromPageToShoppingList } from '@/hooks/dom/useOpenPDP';
@@ -18,7 +19,7 @@ import {
 } from '@/store';
 import { setB2BToken } from '@/store/slices/company';
 import { QuoteItem } from '@/types/quotes';
-import CallbackManager from '@/utils/b3Callbacks';
+import CallbackManager from '@/utils/b3CallbackManager';
 import { LineItems } from '@/utils/b3Product/b3Product';
 import createShoppingList from '@/utils/b3ShoppingList/b3ShoppingList';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
@@ -54,6 +55,8 @@ const transformOptionSelectionsToAttributes = (items: LineItems[]) =>
   });
 
 export type ProductMappedAttributes = ReturnType<typeof transformOptionSelectionsToAttributes>;
+
+const Manager = new CallbackManager();
 
 export default function HeadlessController({ setOpenPage }: HeadlessControllerProps) {
   const storeDispatch = useAppDispatch();
@@ -119,7 +122,7 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
   useEffect(() => {
     window.b2b = {
       ...window.b2b,
-      callbacks: new CallbackManager(),
+      callbacks: Manager,
       utils: {
         openPage: (page) =>
           setTimeout(() => {
@@ -158,7 +161,7 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
             } = await superAdminCompanies(customerRef.current.b2bId, {
               first: 50,
               offset: 0,
-              orderBy: 'companyId',
+              orderBy: 'companyName',
             });
 
             return {
@@ -171,15 +174,12 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
             if (typeof customerRef.current.b2bId !== 'number') return;
             startMasquerade({
               companyId,
-              b2bId: customerRef.current.b2bId,
               customerId: customerIdRef.current,
             });
           },
           endMasquerade: () => {
             if (typeof customerRef.current.b2bId !== 'number') return;
-            endMasquerade({
-              b2bId: customerRef.current.b2bId,
-            });
+            endMasquerade();
           },
           graphqlBCProxy: B3Request.graphqlBCProxy,
           loginWithB2BStorefrontToken: async (b2bStorefrontJWTToken: string) => {
@@ -221,6 +221,12 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
             ...shoppingListBtnRef.current,
             enabled: shoppingListEnabledRef.current,
           }),
+        },
+        cart: {
+          setEntityId: (entityId) => {
+            Cookies.set('cartId', entityId);
+          },
+          getEntityId: () => Cookies.get('cartId'),
         },
       },
     };

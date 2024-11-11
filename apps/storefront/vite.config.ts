@@ -94,6 +94,7 @@ export default defineConfig(({ mode }) => {
     build: {
       minify: true,
       outDir: 'dist',
+      sourcemap: true,
       rollupOptions: {
         input: {
           index: 'src/main.ts',
@@ -105,30 +106,31 @@ export default defineConfig(({ mode }) => {
             return name.includes('headless') ? '[name].js' : '[name].js';
           },
           chunkFileNames: 'assets/[name].js',
+          manualChunks: {
+            reactVendor: ['react', 'react-dom'],
+            intl: ['react-intl'],
+            mui: ['@emotion/react', '@emotion/styled', '@mui/material'],
+            muiIcon: ['@mui/icons-material'],
+            redux: ['react-redux'],
+            dateFns: ['date-fns'],
+            lang: ['@b3/lang'],
+            pdfobject: ['pdfobject'],
+            resizable: ['react-resizable'],
+            pdf: ['react-pdf'],
+            toolkit: ['@reduxjs/toolkit'],
+            form: ['react-hook-form'],
+            router: ['react-router-dom'],
+            lodashEs: ['lodash-es'],
+            dropzone: ['react-dropzone'],
+            draggable: ['react-draggable'],
+            eCache: ['@emotion/cache'],
+          },
         },
         onwarn(warning, warn) {
           if (warning.code === 'MODULE_LEVEL_DIRECTIVE') {
             return;
           }
           warn(warning);
-        },
-        manualChunks: {
-          intl: ['react-intl'],
-          redux: ['react-redux'],
-          dateFns: ['date-fns'],
-          lang: ['@b3/lang'],
-          pdfobject: ['pdfobject'],
-          resizable: ['react-resizable'],
-          pdf: ['react-pdf'],
-          toolkit: ['@reduxjs/toolkit'],
-          form: ['react-hook-form'],
-          router: ['react-router-dom'],
-          lodashEs: ['lodash-es'],
-          dropzone: ['react-dropzone'],
-          draggable: ['react-draggable'],
-          eCache: ['@emotion/cache'],
-          eReact: ['@emotion/react'],
-          eStyled: ['@emotion/styled'],
         },
         plugins: env.VITE_VISUALIZER === '1' && [
           visualizer({
