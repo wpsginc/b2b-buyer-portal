@@ -37,6 +37,7 @@ import InvoiceListType, {
   filterFormConfigsTranslationVariables,
   sortIdArr,
 } from './utils/config';
+import { formattingNumericValues } from './utils/payment';
 import { handlePrintPDF } from './utils/pdf';
 import { InvoiceItemCard } from './InvoiceItemCard';
 
@@ -138,12 +139,15 @@ function Invoice() {
   const handleStatisticsInvoiceAmount = async () => {
     try {
       setIsRequestLoading(true);
-      const { invoiceStats } = await getInvoiceStats(filterData?.status ? +filterData.status : 0);
+      const { invoiceStats } = await getInvoiceStats(
+        filterData?.status ? +filterData.status : 0,
+        +decimalPlaces,
+      );
 
       if (invoiceStats) {
         const { overDueBalance, totalBalance } = invoiceStats;
-        setUnpaidAmount(+totalBalance.toFixed(decimalPlaces));
-        setOverdueAmount(+overDueBalance.toFixed(decimalPlaces));
+        setUnpaidAmount(+formattingNumericValues(+totalBalance, decimalPlaces));
+        setOverdueAmount(+formattingNumericValues(+overDueBalance, decimalPlaces));
       }
     } catch (err) {
       b2bLogger.error(err);
@@ -408,7 +412,8 @@ function Invoice() {
       const item = invoiceNode;
       item.node.disableCurrentCheckbox = false;
 
-      openBalance.value = (+openBalance.value).toFixed(decimalPlaces);
+      openBalance.originValue = `${+openBalance.value}`;
+      openBalance.value = formattingNumericValues(+openBalance.value, decimalPlaces);
     });
     setList(invoicesList);
     handleStatisticsInvoiceAmount();
@@ -429,13 +434,17 @@ function Invoice() {
     let result = val;
     if (val.includes('.')) {
       const wholeDecimalNumber = val.split('.');
-      const movePoint = wholeDecimalNumber[1].length - +decimalPlaces;
+      const movePoint = decimalPlaces === 0 ? 0 : wholeDecimalNumber[1].length - +decimalPlaces;
       if (wholeDecimalNumber[1] && movePoint > 0) {
         const newVal = wholeDecimalNumber[0] + wholeDecimalNumber[1];
         result = `${newVal.slice(0, -decimalPlaces)}.${newVal.slice(-decimalPlaces)}`;
       }
+      if (wholeDecimalNumber[1] && movePoint === 0) {
+        result = formattingNumericValues(+val, decimalPlaces);
+      }
     } else if (result.length > 1) {
       result = `${val.slice(0, 1)}.${val.slice(-1)}`;
+      if (+decimalPlaces === 0) result = `${val}`;
     } else {
       result = `${val}`;
     }
@@ -522,7 +531,7 @@ function Invoice() {
       isSortable: true,
       render: (item: InvoiceList) => {
         const { originalBalance } = item;
-        const originalAmount = (+originalBalance.value).toFixed(decimalPlaces);
+        const originalAmount = formattingNumericValues(+originalBalance.value, decimalPlaces);
 
         const token = handleGetCorrespondingCurrencyToken(originalBalance.code);
 
@@ -537,7 +546,7 @@ function Invoice() {
       render: (item: InvoiceList) => {
         const { openBalance } = item;
 
-        const openAmount = (+openBalance.value).toFixed(decimalPlaces);
+        const openAmount = formattingNumericValues(+openBalance.value, decimalPlaces);
         const token = handleGetCorrespondingCurrencyToken(openBalance.code);
 
         return `${token}${openAmount || 0}`;

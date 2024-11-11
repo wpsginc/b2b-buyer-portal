@@ -17,6 +17,10 @@
       "outputs": ["dist/**"],
       "cache": false
     },
+    "build:tier1": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
     "test": {
       "dependsOn": ["^build"],
       "cache": false

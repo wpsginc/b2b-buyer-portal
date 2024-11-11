@@ -1,6 +1,30 @@
-import { convertArrayToGraphql, storeHash } from '@/utils';
+import {
+  convertArrayToGraphql,
+  convertObjectOrArrayKeysToCamel,
+  convertObjectOrArrayKeysToSnake,
+  storeHash,
+} from '@/utils';
 
 import B3Request from '../../request/b3Fetch';
+
+interface ProductPriceOption {
+  option_id: number;
+  value_id: number;
+}
+
+interface ProductPriceItem {
+  product_id: number;
+  variant_id: number;
+  options: Partial<ProductPriceOption>[];
+}
+
+interface ProductPrice {
+  storeHash: string;
+  channel_id: number;
+  currency_code: string;
+  items: Partial<ProductPriceItem>[];
+  customer_group_id: number;
+}
 
 const getB2BTokenQl = (currentCustomerJWT: string, channelId: number) => `mutation {
 	authorization(authData: {
@@ -48,10 +72,9 @@ const superAdminCompaniesQl = (id: number, params: CustomFieldItems) => `{
 	}
 }`;
 
-const superAdminBeginMasqueradeQl = (companyId: string | number, userId: number) => `mutation {
+const superAdminBeginMasqueradeQl = (companyId: number) => `mutation {
 	superAdminBeginMasquerade(
 		companyId: ${companyId}
-		userId: ${userId}
 	) {
 		userInfo {
 			email,
@@ -60,10 +83,9 @@ const superAdminBeginMasqueradeQl = (companyId: string | number, userId: number)
 	}
 }`;
 
-const superAdminEndMasqueradeQl = (companyId: string | number, userId: number) => `mutation {
+const superAdminEndMasqueradeQl = (companyId: number) => `mutation {
 	superAdminEndMasquerade(
 		companyId: ${companyId}
-		userId: ${userId}
 	) {
 		message
 	}
@@ -135,12 +157,6 @@ const currencies = (channelId: string | number) => `{
 	}
 }`;
 
-// type storefrontConfigsProps = {
-//   key: String,
-//   value: String,
-//   extraFields: any,
-// }
-
 const storefrontConfigs = (channelId: number, keys: string[]) => `{
 	storefrontConfigs(
 		storeHash: "${storeHash}",
@@ -193,6 +209,108 @@ const companyCreditConfig = () => `{
   }
 }`;
 
+const priceProducts = `query priceProducts($storeHash: String, $channelId: Int, $currencyCode: String!, $customerGroupId: Int, $items: [PricingProductItemInputType]!) {
+  priceProducts(
+		storeHash: $storeHash,
+		channelId: $channelId,
+		currencyCode: $currencyCode,
+		customerGroupId: $customerGroupId,
+		items: $items
+	) {
+    productId
+		variantId
+		options{
+				optionId
+				valueId
+		}
+		referenceRequest{
+				productId
+				variantId
+				options{
+						optionId
+						valueId
+				}
+		}
+		retailPrice{
+				asEntered
+				enteredInclusive
+				taxExclusive
+				taxInclusive
+		}
+		salePrice{
+				asEntered
+				enteredInclusive
+				taxExclusive
+				taxInclusive
+		}
+		minimumAdvertisedPrice{
+				asEntered
+				enteredInclusive
+				taxExclusive
+				taxInclusive
+		}
+		saved{
+				asEntered
+				enteredInclusive
+				taxExclusive
+				taxInclusive
+		}
+		price{
+				asEntered
+				enteredInclusive
+				taxExclusive
+				taxInclusive
+		}
+		calculatedPrice{
+				asEntered
+				enteredInclusive
+				taxExclusive
+				taxInclusive
+		}
+		priceRange{
+				minimum{
+						asEntered
+						enteredInclusive
+						taxExclusive
+						taxInclusive
+				}
+				maximum{
+						asEntered
+						enteredInclusive
+						taxExclusive
+						taxInclusive
+				}
+		}
+		retailPriceRange{
+				minimum{
+						asEntered
+						enteredInclusive
+						taxExclusive
+						taxInclusive
+				}
+				maximum{
+						asEntered
+						enteredInclusive
+						taxExclusive
+						taxInclusive
+				}
+		}
+		bulkPricing{
+				minimum
+				maximum
+				discountAmount
+				discountType
+				taxDiscountAmount{
+						asEntered
+						enteredInclusive
+						taxExclusive
+						taxInclusive
+				}
+		}
+  }
+}
+`;
+
 export const getB2BToken = (currentCustomerJWT: string, channelId = 1) =>
   B3Request.graphqlB2B({
     query: getB2BTokenQl(currentCustomerJWT, channelId),
@@ -208,14 +326,14 @@ export const superAdminCompanies = (id: number, params: CustomFieldItems) =>
     query: superAdminCompaniesQl(id, params),
   });
 
-export const superAdminBeginMasquerade = (companyId: number, userId: number) =>
+export const superAdminBeginMasquerade = (companyId: number) =>
   B3Request.graphqlB2B({
-    query: superAdminBeginMasqueradeQl(companyId, userId),
+    query: superAdminBeginMasqueradeQl(companyId),
   });
 
-export const superAdminEndMasquerade = (companyId: number, userId: number) =>
+export const superAdminEndMasquerade = (companyId: number) =>
   B3Request.graphqlB2B({
-    query: superAdminEndMasqueradeQl(companyId, userId),
+    query: superAdminEndMasqueradeQl(companyId),
   });
 
 export const getUserCompany = (userId: number) =>
@@ -255,4 +373,15 @@ export const getStorefrontDefaultLanguages = (channelId: number) =>
 export const getCompanyCreditConfig = () =>
   B3Request.graphqlB2B({
     query: companyCreditConfig(),
+  });
+
+export const getProductPricing = (data: Partial<ProductPrice>) =>
+  B3Request.graphqlB2B({
+    query: priceProducts,
+    variables: convertObjectOrArrayKeysToCamel(data),
+  }).then((res) => {
+    const { priceProducts: b2bPriceProducts = [] } = res;
+    return {
+      data: convertObjectOrArrayKeysToSnake(b2bPriceProducts) as CustomFieldItems[],
+    };
   });

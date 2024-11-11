@@ -7,7 +7,7 @@ import { useAppSelector } from '@/store';
 import { BcCartData, BcCartDataLineItem, InvoiceListNode } from '@/types/invoice';
 import { handleGetCorrespondingCurrencyToken, snackbar } from '@/utils';
 
-import { gotoInvoiceCheckoutUrl } from '../utils/payment';
+import { formattingNumericValues, gotoInvoiceCheckoutUrl } from '../utils/payment';
 
 interface InvoiceFooterProps {
   selectedPay: CustomFieldItems;
@@ -44,9 +44,13 @@ function InvoiceFooter(props: InvoiceFooterProps) {
           node: { id, openBalance, originalBalance },
         } = item;
 
+        const currentValue =
+          formattingNumericValues(+openBalance.originValue, decimalPlaces) === openBalance.value
+            ? +openBalance.originValue
+            : +openBalance.value;
         lineItems.push({
           invoiceId: +id,
-          amount: openBalance.value === '.' ? '0' : `${+openBalance.value}`,
+          amount: openBalance.value === '.' ? '0' : `${+currentValue}`,
         });
 
         currency = openBalance?.code || originalBalance.code;
@@ -84,7 +88,7 @@ function InvoiceFooter(props: InvoiceFooterProps) {
           amount += openBalance.value === '.' ? 0 : +openBalance.value;
         });
 
-        setSelectedAccount(amount.toFixed(decimalPlaces));
+        setSelectedAccount(formattingNumericValues(amount, decimalPlaces));
       };
       const {
         node: { openBalance },

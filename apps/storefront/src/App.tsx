@@ -22,12 +22,7 @@ import {
 import clearInvoiceCart from './utils/b3ClearCart';
 import b2bLogger from './utils/b3Logger';
 import { isUserGotoLogin } from './utils/b3logout';
-import {
-  getCompanyInfo,
-  getCompanyUserInfo,
-  getCurrentCustomerInfo,
-  loginInfo,
-} from './utils/loginInfo';
+import { getCompanyInfo, getCurrentCustomerInfo, loginInfo } from './utils/loginInfo';
 import {
   getStoreTaxZoneRates,
   getTemPlateConfig,
@@ -200,7 +195,6 @@ export default function App() {
           getStoreTaxZoneRates(),
           setStorefrontConfig(dispatch),
           getTemPlateConfig(styleDispatch, dispatch),
-          getCompanyUserInfo(emailAddress, customerId),
           getCompanyInfo(role, b2bId),
         ]);
       } catch (e) {
@@ -222,13 +216,14 @@ export default function App() {
       // background login enter judgment and refresh
       if (!href.includes('checkout') && !(customerId && !window.location.hash)) {
         await gotoAllowedAppPage(+userInfo.role, gotoPage);
+      } else {
+        showPageMask(false);
       }
 
       if (customerId) {
         clearInvoiceCart();
       }
 
-      showPageMask(false);
       storeDispatch(
         setGlabolCommonState({
           isPageComplete: true,
@@ -329,10 +324,29 @@ export default function App() {
         openUrl: '',
       });
     }
+    const anchorLinks = hash ? hash.split('#')[1] : '';
+    if (anchorLinks && !anchorLinks.includes('/')) {
+      showPageMask(false);
+    }
     // ignore setOpenPage ad storeDispatch
     // due they are funtions that do not depend on any reactive value
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  useEffect(() => {
+    const { hash = '' } = window.location;
+
+    const handleHashChange = () => (!hash || hash === '#/') && setOpenPage({ isOpen: false });
+
+    window.addEventListener('hashchange', handleHashChange);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+    // ignore setOpenPage
+    // due they are funtions that do not depend on any reactive value
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const cssValue = (cssOverride.css || '').replace(/\};/g, '}');
