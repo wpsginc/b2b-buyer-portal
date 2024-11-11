@@ -116,7 +116,7 @@ export default function B3ControlTextField({ control, errors, ...rest }: Form.B3
 
   // remove debounce to validate string upon enter
   const validateNumberField = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (fieldId?.includes('phone_number')) {
+    if (fieldId?.includes('phone_number') || label?.includes('Phone Number')) {
       const allowedKeys = [
         'Digit0',
         'Digit1',
