@@ -84,6 +84,28 @@ function AddressForm(
     mode: 'all',
   });
 
+  const customValidate = async (data: CustomFieldItems) => {
+    try {
+      const addressPhone =
+        allAddressFields?.find((item: CustomFieldItems) => item.label === 'Phone number')?.name ||
+        'phone';
+
+      if (data[addressPhone]?.length > 10 || data[addressPhone]?.length < 10) {
+        setError(addressPhone, {
+          type: 'custom',
+          message: 'Please enter a valid phone number',
+        });
+        setAddUpdateLoading(false);
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      snackbar.error(error);
+      throw error;
+    }
+  };
+
   const validateCompanyExtraFieldsUnique = async (data: CustomFieldItems) => {
     try {
       const extraFields = addressExtraFields.map((field: CustomFieldItems) => ({
@@ -140,8 +162,9 @@ function AddressForm(
       setAddUpdateLoading(true);
 
       try {
+        const isCustomValidate = await customValidate(data);
         const isValidate = await validateCompanyExtraFieldsUnique(data);
-        if (!isValidate) {
+        if (!isValidate || !isCustomValidate) {
           return;
         }
 
@@ -222,6 +245,11 @@ function AddressForm(
   const handleSaveBcAddress = () => {
     handleSubmit(async (data) => {
       setAddUpdateLoading(true);
+
+      const isCustomValidate = await customValidate(data);
+      if (!isCustomValidate) {
+        return;
+      }
 
       try {
         const extraFields = addressExtraFields.map((field: CustomFieldItems) => ({
@@ -533,7 +561,7 @@ function AddressForm(
     >
       {isB2BUser && (
         <>
-          <p>{b3Lang('addresses.addressForm.selectAddressType')}</p>
+          {/* <p>{b3Lang('addresses.addressForm.selectAddressType')}</p> */}
 
           <StyledCheckbox>
             {b2bShippingBilling.map((item: B2bShippingBillingProps) => {
