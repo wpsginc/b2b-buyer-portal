@@ -160,6 +160,14 @@ Request to B2B graphql API using B2B token
         throw new Error(message);
       }
 
+      if (value?.data?.countries?.length > 0) {
+        return {
+          countries: value.data.countries?.filter(
+            (country: any) => country.countryCode === 'US' || country.countryCode === 'CA',
+          ),
+        };
+      }
+
       return value.data;
     });
   },
