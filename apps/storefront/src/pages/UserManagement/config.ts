@@ -75,12 +75,12 @@ const getUserRole = () => {
       value: 1,
       idLang: 'userManagement.userRole.seniorBuyer',
     },
-    {
-      label: 'Junior buyer',
-      name: 'Junior Buyer',
-      value: 2,
-      idLang: 'userManagement.userRole.juniorBuyer',
-    },
+    // {
+    //   label: 'Junior buyer',
+    //   name: 'Junior Buyer',
+    //   value: 2,
+    //   idLang: 'userManagement.userRole.juniorBuyer',
+    // },
   ];
 
   return userRole;
