@@ -82,10 +82,12 @@ export default function B3ControlAutocomplete({ control, errors, ...rest }: Form
         search: value,
       });
 
-      const list = edges.map((item: any) => ({
-        id: item.node.id,
-        name: item.node.name,
-      }));
+      const list = edges
+        .map((item: any) => ({
+          id: item.node.id,
+          name: item.node.name,
+        }))
+        .filter((item: any) => item.name !== 'Junior Buyer');
 
       setOptions((prevOptions) => (type === 'search' ? [...list] : [...prevOptions, ...list]));
       setHasMore(list.length > 0);

@@ -45,6 +45,12 @@ const headCells = [
     label: 'Returnable',
   },
   {
+    id: 'rmaNumber',
+    numeric: false,
+    disablePadding: false,
+    label: 'RMA #',
+  },
+  {
     id: 'createdAt',
     numeric: false,
     disablePadding: false,
@@ -270,6 +276,7 @@ export default function NetsuiteOrders({ companyId, isCompanyOrder }: NetsuiteOr
                         <TableCell align="center">
                           {data.returnable === true ? 'Yes' : 'No'}
                         </TableCell>
+                        <TableCell align="center">{data?.rma ? data.rma : '-'}</TableCell>
                         <TableCell align="center">{dateFormat(data.date)}</TableCell>
                       </TableRow>
                     );
@@ -280,7 +287,7 @@ export default function NetsuiteOrders({ companyId, isCompanyOrder }: NetsuiteOr
                         height: 53 * emptyRows,
                       }}
                     >
-                      <TableCell colSpan={5} />
+                      <TableCell colSpan={6} />
                     </TableRow>
                   )}
                 </TableBody>
