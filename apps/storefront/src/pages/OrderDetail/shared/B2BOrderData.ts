@@ -107,6 +107,7 @@ const getOrderSummary = (data: B2BOrderData, b3Lang: LangFormatFunction) => {
     shippingCostExTax,
     shippingCostIncTax,
     coupons,
+    giftCertificateAmount,
   } = data;
 
   const {
@@ -132,6 +133,7 @@ const getOrderSummary = (data: B2BOrderData, b3Lang: LangFormatFunction) => {
     handingFee: b3Lang('orderDetail.summary.handingFee'),
     ...couponlabel,
     tax: b3Lang('orderDetail.summary.tax'),
+    giftCertificateAmount: b3Lang('orderDetail.summary.giftCertificateAmount'),
     grandTotal: b3Lang('orderDetail.summary.grandTotal'),
   };
 
@@ -146,6 +148,7 @@ const getOrderSummary = (data: B2BOrderData, b3Lang: LangFormatFunction) => {
       [labels.handingFee]: formatPrice(handlingCostIncTax || handlingCostExTax || ''),
       ...couponPrice,
       [labels.tax]: formatPrice(totalTax || ''),
+      [labels.giftCertificateAmount]: formatPrice(giftCertificateAmount || ''),
       [labels.grandTotal]: formatPrice(totalIncTax || totalExTax || ''),
     },
     priceSymbol: {
@@ -154,6 +157,7 @@ const getOrderSummary = (data: B2BOrderData, b3Lang: LangFormatFunction) => {
       [labels.handingFee]: 'handingFee',
       ...couponSymbol,
       [labels.tax]: 'tax',
+      [labels.giftCertificateAmount]: 'giftCertificateAmount',
       [labels.grandTotal]: 'grandTotal',
     },
   };

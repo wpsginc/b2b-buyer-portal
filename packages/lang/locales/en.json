@@ -393,6 +393,7 @@
   "orderDetail.summary.coupon": "Coupon{couponCode}",
   "orderDetail.summary.tax": "Tax",
   "orderDetail.summary.grandTotal": "Grand total",
+  "orderDetail.summary.giftCertificateAmount": "Gift Certificate",
   "orderDetail.addToShoppingList.productsAdded": "Products were added to your shopping list",
   "orderDetail.viewShoppingList": "View shopping list",
 

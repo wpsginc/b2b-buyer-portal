@@ -273,6 +273,7 @@ export interface B2BOrderData {
   wrappingCostIncTax: string;
   wrappingCostTax: string;
   wrappingCostTaxClassId: number;
+  giftCertificateAmount: string;
 }
 
 export interface OrderDetailsResponse {
