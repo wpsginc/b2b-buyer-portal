@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TablePagination from '@mui/material/TablePagination';
-import TableRow from '@mui/material/TableRow';
-import TableSortLabel from '@mui/material/TableSortLabel';
+import { useB3Lang } from '@b3/lang';
+import {
+  Box,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TableSortLabel,
+} from '@mui/material';
 
 import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
-import { getNSOrders } from '@/shared/service/b2b';
+import { getCustomData } from '@/shared/service/b2b';
 import { useAppSelector } from '@/store';
 
 import OrderStatus from './OrderStatus';
@@ -58,8 +61,6 @@ const headCells = [
   },
 ];
 
-// console.log(isMobile);
-
 function EnhancedTableHead() {
   const [isMobile] = useMobile();
 
@@ -99,6 +100,7 @@ export default function NetsuiteOrders({ companyId, isCompanyOrder }: NetsuiteOr
 
   const navigate = useNavigate();
   const [isMobile] = useMobile();
+  const b3Lang = useB3Lang();
 
   useEffect(() => {
     const initializeOrders = async () => {
@@ -108,10 +110,11 @@ export default function NetsuiteOrders({ companyId, isCompanyOrder }: NetsuiteOr
           customer_id: isCompanyOrder ? companyId || customerId.toString() : customerId.toString(),
           return_reason: [],
           line_items: [],
+          submitType: 'get-orders',
         },
       ];
 
-      const fn = await getNSOrders(data);
+      const fn = await getCustomData(data);
       const nsOrders = await fn;
       const totalCount = nsOrders?.orders?.length;
       const orders = nsOrders?.orders;
@@ -156,13 +159,11 @@ export default function NetsuiteOrders({ companyId, isCompanyOrder }: NetsuiteOr
     setPage(0);
   };
 
-  // Avoid a layout jump when reaching the last page with empty rows.
   const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - allTotal) : 0;
 
   const visibleRows = useMemo(
     () => allOrders?.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, rowsPerPage],
+    [page, rowsPerPage, allOrders],
   );
 
   return (
@@ -256,38 +257,41 @@ export default function NetsuiteOrders({ companyId, isCompanyOrder }: NetsuiteOr
               <Table aria-labelledby="netsuiteOrders" size="medium">
                 <EnhancedTableHead />
                 <TableBody>
-                  {visibleRows?.map((data: any) => {
-                    return (
-                      <TableRow
-                        hover
-                        onClick={() => handleClick(data.nsOrderInternalID)}
-                        role="checkbox"
-                        tabIndex={-1}
-                        key={data.nsOrderInternalID}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        <TableCell align="center">
-                          {data.bcOrderNum ? data.bcOrderNum : '-'}
-                        </TableCell>
-                        <TableCell align="center">{data.orderNumber}</TableCell>
-                        <TableCell align="center">
-                          <OrderStatus code={data.status} />
-                        </TableCell>
-                        <TableCell align="center">
-                          {data.returnable === true ? 'Yes' : 'No'}
-                        </TableCell>
-                        <TableCell align="center">{data?.rma ? data.rma : '-'}</TableCell>
-                        <TableCell align="center">{dateFormat(data.date)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {emptyRows > 0 && (
+                  {visibleRows?.length > 0 ? (
+                    visibleRows?.map((data: any) => {
+                      return (
+                        <TableRow
+                          hover
+                          onClick={() => handleClick(data.nsOrderInternalID)}
+                          role="checkbox"
+                          tabIndex={-1}
+                          key={data.nsOrderInternalID}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          <TableCell align="center">
+                            {data.bcOrderNum ? data.bcOrderNum : '-'}
+                          </TableCell>
+                          <TableCell align="center">{data.orderNumber}</TableCell>
+                          <TableCell align="center">
+                            <OrderStatus code={data.status} />
+                          </TableCell>
+                          <TableCell align="center">
+                            {data.returnable === true ? 'Yes' : 'No'}
+                          </TableCell>
+                          <TableCell align="center">{data?.rma ? data.rma : '-'}</TableCell>
+                          <TableCell align="center">{dateFormat(data.date)}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
                     <TableRow
                       style={{
                         height: 53 * emptyRows,
                       }}
                     >
-                      <TableCell colSpan={6} />
+                      <TableCell align="center" colSpan={6} sx={{ fontSize: '16px' }}>
+                        {b3Lang('orderDetail.invoice.noOrders')}
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>

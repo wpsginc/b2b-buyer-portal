@@ -17,7 +17,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 // const Invoice = lazy(() => import('@/pages/Invoice'));
-const InvoiceDetail = lazy(() => import('@/pages/InvoiceDetail'));
+// const InvoiceDetail = lazy(() => import('@/pages/InvoiceDetail'));
 const InvoicePayment = lazy(() => import('@/pages/InvoicePayment'));
 const Login = lazy(() => import('@/pages/Login'));
 const OrderDetail = lazy(() => import('@/pages/OrderDetail'));
@@ -32,6 +32,7 @@ const RegisteredBCToB2B = lazy(() => import('@/pages/RegisteredBCToB2B'));
 // const ShippingLists = lazy(() => import('@/pages/ShoppingLists'));
 const ShoppingListDetails = lazy(() => import('@/pages/ShoppingListDetails'));
 const UserManagement = lazy(() => import('@/pages/UserManagement'));
+const customInvoiceList = lazy(() => import('@/pages/CustomInvoice/components/Invoice'));
 
 interface RouteItemBasic {
   component: FC<PageProps>;
@@ -87,24 +88,17 @@ const routes: RouteItem[] = [
     isTokenLogin: true,
     idLang: 'global.navMenu.companyOrders',
   },
-  // {
-  //   path: '/invoice',
-  //   name: 'Invoice',
-  //   wsKey: 'invoice',
-  //   isMenuItem: true,
-  //   component: Invoice,
-  //   configKey: 'invoice',
-  //   permissions: [0, 1, 3],
-  //   permissionCodes: [
-  //     'get_invoices',
-  //     'get_invoice_detail',
-  //     'get_invoice_pdf',
-  //     'export_invoices',
-  //     'get_invoice_payments_history',
-  //   ],
-  //   isTokenLogin: true,
-  //   idLang: 'global.navMenu.invoice',
-  // },
+  {
+    path: '/invoice',
+    name: 'Invoice',
+    wsKey: 'invoice',
+    isMenuItem: true,
+    component: customInvoiceList,
+    configKey: 'invoice',
+    permissions: [0, 2, 1, 3, 4, 99, 100],
+    isTokenLogin: true,
+    idLang: 'global.navMenu.invoice',
+  },
   // {
   //   path: '/quotes',
   //   name: 'Quotes',
@@ -152,18 +146,18 @@ const routes: RouteItem[] = [
     isTokenLogin: true,
     idLang: 'global.navMenu.orderDetail',
   },
-  {
-    path: '/invoiceDetail/:id',
-    name: 'Invoice details',
-    wsKey: 'router-invoice',
-    isMenuItem: false,
-    component: InvoiceDetail,
-    permissions: [0, 1, 3, 99, 100],
-    permissionCodes:
-      'get_invoices, get_invoice_detail, get_invoice_pdf, export_invoices, get_invoice_payments_history',
-    isTokenLogin: true,
-    idLang: 'global.navMenu.invoiceDetail',
-  },
+  // {
+  //   path: '/invoiceDetail/:id',
+  //   name: 'Invoice details',
+  //   wsKey: 'router-invoice',
+  //   isMenuItem: false,
+  //   component: InvoiceDetail,
+  //   permissions: [0, 1, 3, 99, 100],
+  //   permissionCodes:
+  //     'get_invoices, get_invoice_detail, get_invoice_pdf, export_invoices, get_invoice_payments_history',
+  //   isTokenLogin: true,
+  //   idLang: 'global.navMenu.invoiceDetail',
+  // },
   {
     path: '/addresses',
     name: 'Addresses',

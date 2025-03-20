@@ -1,8 +1,10 @@
-const { VITE_B2B_URL, VITE_NETSUITE_BACKEND, VITE_NETSUITE_TOKEN } = import.meta.env;
+const { VITE_B2B_URL, VITE_NETSUITE_BACKEND, VITE_NETSUITE_TOKEN, VITE_ENCRYPTION_SECRET } =
+  import.meta.env;
 
 const B2B_BASIC_URL = VITE_B2B_URL;
 const NS_BACKEND = VITE_NETSUITE_BACKEND;
 const NS_TOKEN = VITE_NETSUITE_TOKEN;
+const ENCRYPTIONSECRET = VITE_ENCRYPTION_SECRET;
 
 enum RequestType {
   B2BGraphql = 'B2BGraphql',
@@ -25,4 +27,4 @@ const queryParse = <T>(query: T): string => {
   return queryText.slice(0, -1);
 };
 
-export { B2B_BASIC_URL, NS_BACKEND, NS_TOKEN, queryParse, RequestType };
+export { B2B_BASIC_URL, NS_BACKEND, NS_TOKEN, ENCRYPTIONSECRET, queryParse, RequestType };

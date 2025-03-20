@@ -24,7 +24,12 @@ import { AddressConfigItem, OrderProductItem, OrderStatusItem } from '../../type
 import OrderStatus from '../order/components/OrderStatus';
 import { orderStatusTranslationVariables } from '../order/shared/getOrderStatus';
 
-import NSOrderItems from './components/netsuite/OrderItems';
+import {
+  NSOrderDetailsContext,
+  NSOrderDetailsProvider,
+} from './components/context/NSOrderDetailsContext';
+import NSOrderItemList from './components/netsuite/OrderItemList';
+import OrderOtherDetails from './components/netsuite/OrderOtherDetails';
 import { OrderDetailsContext, OrderDetailsProvider } from './context/OrderDetailsContext';
 import convertB2BOrderDetails from './shared/B2BOrderData';
 import {
@@ -43,11 +48,8 @@ interface LocationState {
 
 function OrderDetail() {
   const isB2BUser = useAppSelector(isB2BUserSelector);
-
   const params = useParams();
-
   const navigate = useNavigate();
-
   const b3Lang = useB3Lang();
 
   const {
@@ -62,38 +64,41 @@ function OrderDetail() {
   } = useContext(OrderDetailsContext);
 
   const {
+    state: { orderNumber, status: nSOrderStatus = '' },
+    state: nsDetailsData,
+    dispatch: NSDispatch,
+  } = useContext(NSOrderDetailsContext);
+
+  const {
     state: {
       portalStyle: { backgroundColor = '#FEF9F5' },
     },
   } = useContext(CustomStyleContext);
 
   const customColor = getContrastColor(backgroundColor);
-
   const localtion = useLocation();
-
   const [isMobile] = useMobile();
   const [preOrderId, setPreOrderId] = useState('');
   const [orderId, setOrderId] = useState('');
+  const [nsInternalId, setNSInternalID] = useState('');
   const [isRequestLoading, setIsRequestLoading] = useState(false);
 
-  const [isNsOrder, setisNsOrder] = useState(false);
   const customerId = useAppSelector(({ company }) => company.customer.id);
-  const [nsStatus, setNsStatus] = useState('');
-  const [nsItemDetails, setNSItemDetails] = useState([]);
-
-  useEffect(() => {
-    setOrderId(params.id || '');
-  }, [params]);
 
   const goToOrders = () => {
     navigate(
       `${(localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders'}`,
       {
         state: {
-          isNetsuiteOrder: isNsOrder ? 1 : 0,
+          isNetsuiteOrder: nsInternalId ? 1 : 0,
         },
       },
     );
+  };
+
+  const checkOrderValue = (bcOrder: string) => {
+    const parsedValue = parseFloat(bcOrder);
+    return Number.isNaN(parsedValue) ? '' : bcOrder;
   };
 
   useEffect(() => {
@@ -101,118 +106,121 @@ function OrderDetail() {
 
     if (params?.id?.includes('ns-')) {
       paramId = params?.id?.split('-')[1];
-      setisNsOrder(true);
     } else {
       paramId = params.id || '';
     }
 
-    setOrderId(paramId);
+    setNSInternalID(paramId);
   }, [params]);
 
   useEffect(() => {
-    if (orderId) {
-      if (isNsOrder) {
-        const getReturnDetails = async () => {
-          const id = parseInt(orderId, 10);
-          if (!id) return;
+    const getReturnDetails = async () => {
+      const id = parseInt(nsInternalId, 10);
+      if (!id) return;
 
-          setIsRequestLoading(true);
+      setIsRequestLoading(true);
 
-          try {
-            const data = [
-              {
-                order_id: parseInt(orderId, 10),
-                customer_id: customerId,
-                return_reason: [],
-                line_items: [],
-              },
-            ];
+      try {
+        const data = [
+          {
+            order_id: parseInt(nsInternalId, 10),
+            customer_id: customerId.toString(),
+            return_reason: [],
+            line_items: [],
+            submitType: 'get-order',
+          },
+        ];
 
-            const req = getNSReturnDetails(data);
-            const nsDetails = await req;
-            const orderStat = nsDetails?.status;
-            const orderNum = nsDetails?.orderNumber;
+        const req = getNSReturnDetails(data);
+        const nsDetails = await req;
 
-            setNsStatus(orderStat);
-            setNSItemDetails(nsDetails);
-            setOrderId(orderNum);
-          } catch (err) {
-            if (err === 'order does not exist') {
-              setTimeout(() => {
-                window.location.hash = `/orderDetail/${preOrderId}`;
-              }, 1000);
-            }
-          } finally {
-            setIsRequestLoading(false);
-          }
-        };
+        NSDispatch({
+          type: 'all',
+          payload: nsDetails,
+        });
 
-        getReturnDetails();
-      } else {
-        const getOrderDetails = async () => {
-          const id = parseInt(orderId, 10);
-
-          if (!id) {
-            return;
-          }
-
-          setIsRequestLoading(true);
-
-          try {
-            const order = isB2BUser ? await getB2BOrderDetails(id) : await getBCOrderDetails(id);
-
-            if (order) {
-              const { products } = order;
-
-              const newOrder = {
-                ...order,
-                products: products.map((item: OrderProductItem) => {
-                  return {
-                    ...item,
-                    imageUrl: item?.variantImageUrl || item.imageUrl,
-                  };
-                }),
-              };
-
-              const data = isB2BUser
-                ? convertB2BOrderDetails(newOrder, b3Lang)
-                : convertBCOrderDetails(newOrder, b3Lang);
-              dispatch({
-                type: 'all',
-                payload: data,
-              });
-              setPreOrderId(orderId);
-              // dispatch({
-              //   type: 'variantImages',
-              //   payload: {
-              //     variantImages: [],
-              //   },
-              // });
-              // setCanGetVariantImages(true);
-            }
-          } catch (err) {
-            if (err === 'order does not exist') {
-              setTimeout(() => {
-                window.location.hash = `/orderDetail/${preOrderId}`;
-              }, 1000);
-            }
-          } finally {
-            setIsRequestLoading(false);
-          }
-        };
-        const getOrderStatus = async () => {
-          const orderStatus = isB2BUser ? await getOrderStatusType() : await getBcOrderStatusType();
-
-          dispatch({
-            type: 'statusType',
-            payload: {
-              orderStatus,
-            },
-          });
-        };
-        getOrderDetails();
-        getOrderStatus();
+        const bcOrder = checkOrderValue(nsDetails?.bcOrderNum);
+        if (bcOrder) setOrderId(bcOrder);
+      } catch (err) {
+        if (err === 'order does not exist') {
+          setTimeout(() => {
+            // window.location.hash = `/orderDetail/${preOrderId}`;
+          }, 1000);
+        }
+      } finally {
+        setIsRequestLoading(false);
       }
+    };
+
+    getReturnDetails();
+  }, [nsInternalId, NSDispatch, customerId]);
+
+  useEffect(() => {
+    if (orderId) {
+      const getOrderDetails = async () => {
+        const testid = '108';
+        const id = parseInt(testid, 10);
+
+        if (!id) {
+          return;
+        }
+
+        setIsRequestLoading(true);
+
+        try {
+          const order = isB2BUser ? await getB2BOrderDetails(id) : await getBCOrderDetails(id);
+
+          if (order) {
+            const { products } = order;
+
+            const newOrder = {
+              ...order,
+              products: products.map((item: OrderProductItem) => {
+                return {
+                  ...item,
+                  imageUrl: item?.variantImageUrl || item.imageUrl,
+                };
+              }),
+            };
+
+            const data = isB2BUser
+              ? convertB2BOrderDetails(newOrder, b3Lang)
+              : convertBCOrderDetails(newOrder, b3Lang);
+            dispatch({
+              type: 'all',
+              payload: data,
+            });
+            setPreOrderId(orderId);
+            // dispatch({
+            //   type: 'variantImages',
+            //   payload: {
+            //     variantImages: [],
+            //   },
+            // });
+            // setCanGetVariantImages(true);
+          }
+        } catch (err) {
+          if (err === 'order does not exist') {
+            setTimeout(() => {
+              window.location.hash = `/orderDetail/${preOrderId}`;
+            }, 1000);
+          }
+        } finally {
+          setIsRequestLoading(false);
+        }
+      };
+      const getOrderStatus = async () => {
+        const orderStatus = isB2BUser ? await getOrderStatusType() : await getBcOrderStatusType();
+
+        dispatch({
+          type: 'statusType',
+          payload: {
+            orderStatus,
+          },
+        });
+      };
+      getOrderDetails();
+      getOrderStatus();
     }
     // Disabling rule since dispatch does not need to be in the dep array and b3Lang has rendering errors
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -328,17 +336,17 @@ function OrderDetail() {
                 color: b3HexToRgb(customColor, 0.87) || '#263238',
               }}
             >
-              {b3Lang('orderDetail.orderId', { orderId })}
+              {b3Lang('orderDetail.orderId', { orderId: orderId || orderNumber || '' })}
               {b3Lang('orderDetail.purchaseOrderNumber', {
                 purchaseOrderNumber: poNumber ?? '',
               })}
             </Typography>
             <OrderStatus
-              code={isNsOrder ? nsStatus : status}
-              text={getOrderStatusLabel(isNsOrder ? nsStatus : status)}
+              code={nsInternalId ? nSOrderStatus : status}
+              text={getOrderStatusLabel(nsInternalId ? nSOrderStatus : status)}
             />
           </Grid>
-          {!isNsOrder ? (
+          {!nsInternalId ? (
             <Grid
               container
               item
@@ -360,85 +368,59 @@ function OrderDetail() {
             ''
           )}
         </Grid>
-        {isNsOrder ? (
+        <Grid
+          container
+          spacing={2}
+          sx={{
+            marginTop: '0',
+            overflow: 'auto',
+            flexWrap: isMobile ? 'wrap' : 'nowrap',
+            paddingBottom: '20px',
+          }}
+        >
           <Grid
-            container
-            spacing={2}
-            sx={{
-              marginTop: '0',
-              overflow: 'auto',
-              flexWrap: isMobile ? 'wrap' : 'nowrap',
-              paddingBottom: '20px',
-            }}
+            item
+            sx={
+              isMobile
+                ? {
+                    flexBasis: '100%',
+                  }
+                : {
+                    flexBasis: '690px',
+                    flexGrow: 1,
+                  }
+            }
           >
-            <Grid
-              item
-              sx={
-                isMobile
-                  ? {
-                      flexBasis: '100%',
-                    }
-                  : {
-                      flexBasis: '690px',
-                      flexGrow: 1,
-                    }
-              }
-            >
-              <Stack spacing={3}>
-                <NSOrderItems nsItemDetails={nsItemDetails} />
-              </Stack>
-            </Grid>
-          </Grid>
-        ) : (
-          <Grid
-            container
-            spacing={2}
-            sx={{
-              marginTop: '0',
-              overflow: 'auto',
-              flexWrap: isMobile ? 'wrap' : 'nowrap',
-              paddingBottom: '20px',
-            }}
-          >
-            <Grid
-              item
-              sx={
-                isMobile
-                  ? {
-                      flexBasis: '100%',
-                    }
-                  : {
-                      flexBasis: '690px',
-                      flexGrow: 1,
-                    }
-              }
-            >
-              <Stack spacing={3}>
-                <OrderShipping />
-                {/* Digital Order Display */}
-                <OrderBilling />
-
-                <OrderHistory />
-              </Stack>
-            </Grid>
-            <Grid
-              item
-              sx={
-                isMobile
-                  ? {
-                      flexBasis: '100%',
-                    }
-                  : {
-                      flexBasis: '340px',
-                    }
-              }
-            >
-              {JSON.stringify(orderSummary) === '{}' ? null : (
-                <OrderAction detailsData={detailsData} />
+            <Stack spacing={3}>
+              {nsInternalId ? (
+                <NSOrderItemList />
+              ) : (
+                <>
+                  <OrderShipping />
+                  <OrderBilling />
+                  <OrderHistory />
+                </>
               )}
-            </Grid>
+            </Stack>
           </Grid>
-        )}
+          <Grid
+            item
+            sx={
+              isMobile
+                ? {
+                    flexBasis: '100%',
+                  }
+                : {
+                    flexBasis: '340px',
+                  }
+            }
+          >
+            {nsInternalId && nsDetailsData ? <OrderOtherDetails /> : ''}
+            {JSON.stringify(orderSummary) === '{}' ? null : (
+              <OrderAction detailsData={detailsData} />
+            )}
+          </Grid>
+        </Grid>
       </Box>
     </B3Spin>
   );
@@ -447,7 +429,9 @@ function OrderDetail() {
 function OrderDetailsContent() {
   return (
     <OrderDetailsProvider>
-      <OrderDetail />
+      <NSOrderDetailsProvider>
+        <OrderDetail />
+      </NSOrderDetailsProvider>
     </OrderDetailsProvider>
   );
 }

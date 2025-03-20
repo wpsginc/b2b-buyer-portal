@@ -2,9 +2,11 @@ import Cookies from 'js-cookie';
 
 import { store } from '@/store';
 import { baseUrl, channelId, snackbar, storeHash } from '@/utils';
+import { encrypt } from '@/utils/customUtils';
 
 import {
   B2B_BASIC_URL,
+  ENCRYPTIONSECRET,
   NS_BACKEND,
   NS_TOKEN,
   queryParse,
@@ -68,17 +70,23 @@ function graphqlRequest<T, Y>(type: RequestTypeKeys, data: T, config?: Y) {
 }
 
 function nsRequest<Y>(type: RequestTypeKeys, data: any, config?: Y) {
-  const { order_id, customer_id, return_reason, line_items } = data[0];
+  const { order_id, customer_id, return_reason, line_items, invID, submitType } = data[0];
   const orderID = order_id;
   const customerID = customer_id;
   const returnReason = return_reason;
   const lineItems = line_items;
+  const inv_id = invID ? encrypt(invID, ENCRYPTIONSECRET) : invID;
+  const sType = submitType;
 
   const data_json = {
-    custId: customerID.toString() || '0',
+    custId:
+      sType === 'invoices' || sType === 'invoice'
+        ? encrypt(customerID.toString(), ENCRYPTIONSECRET)
+        : customerID.toString(),
     orderID: orderID.toString() || '0',
     order: order_id.toString() || '0',
     returnReason: returnReason || '',
+    invID: inv_id || 0,
     lines:
       lineItems && lineItems.length > 0
         ? lineItems.map((line: { lineKey: number; quantityToReturn: number }) => ({
@@ -98,9 +106,7 @@ function nsRequest<Y>(type: RequestTypeKeys, data: any, config?: Y) {
 
   let url = GraphqlEndpointsFn(type);
 
-  if (line_items.length < 1 && order_id === 0) url = `${url}/get-orders`;
-  if (line_items.length < 1 && order_id > 0) url = `${url}/get-order`;
-  if (line_items && line_items.length > 0 && return_reason) url = `${url}/create-return`;
+  url = `${url}/${sType}`;
 
   return nsFetch(url, init);
 }

@@ -1,283 +1,68 @@
-import { Fragment } from 'react';
-import { useB3Lang } from '@b3/lang';
-import styled from '@emotion/styled';
-import { Box, Card, CardContent, Stack, Typography } from '@mui/material';
+import { Box, Grid, Stack } from '@mui/material';
 
-import { PRODUCT_DEFAULT_IMAGE } from '@/constants';
+import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
-import { useAppSelector } from '@/store';
 
-import { ProductImage } from '../../styled';
+import NSOrderItemList from './OrderItemList';
+import OrderOtherDetails from './OrderOtherDetails';
 
-import OrderAction from './OrderAction';
-
-interface FlexProps {
-  isHeader?: boolean;
-  isMobile?: boolean;
-}
-
-interface FlexItemProps {
-  width?: string;
-  padding?: string;
-  textAlignLocation?: string;
-  sx?: {
-    [key: string]: string | number;
-  };
-}
-
-const ProductHead = styled('div')(() => ({
-  fontSize: '0.875rem',
-  lineHeight: '1.5',
-  color: '#263238',
-}));
-
-const Flex = styled('div')<FlexProps>(({ isHeader, isMobile }) => {
-  const headerStyle = isHeader
-    ? {
-        borderBottom: '1px solid #D9DCE9',
-        paddingBottom: '8px',
-      }
-    : {};
-
-  const mobileStyle = isMobile
-    ? {
-        borderTop: '1px solid #D9DCE9',
-        padding: '12px 0 12px',
-        '&:first-of-type': {
-          marginTop: '12px',
-        },
-      }
-    : {};
-
-  const flexWrap = isMobile ? 'wrap' : 'initial';
-
-  return {
-    color: '#212121',
-    display: isMobile && isHeader ? 'none' : 'flex',
-    wordBreak: 'break-word',
-    padding: '8px 0 0',
-    gap: '8px',
-    flexWrap,
-    alignItems: ' flex-start',
-    ...headerStyle,
-    ...mobileStyle,
-  };
-});
-
-const FlexItem = styled('div')(
-  ({ width, textAlignLocation, padding = '0', sx }: FlexItemProps) => ({
-    display: 'flex',
-    justifyContent: textAlignLocation,
-    flexGrow: width ? 0 : 1,
-    flexShrink: width ? 0 : 1,
-    alignItems: 'center',
-    width,
-    padding,
-    ...sx,
-  }),
-);
-
-const defaultItemStyle = {
-  default: {
-    width: '10%',
-  },
-  qty: {
-    width: '12%',
-  },
-};
-
-const mobileItemStyle = {
-  default: {
-    width: '100%',
-    padding: '0 0 0 76px',
-  },
-  qty: {
-    width: '100%',
-    padding: '0 0 0 76px',
-  },
-};
-
-const statusNotes = (status: string) => {
-  let statusText = '';
-
-  // Allowed statuses, Partially Fullfilled / Fulfilled / Billed / Fully Billed
-  const statuses = ['fullybilled', 'partiallyfulfilled', 'fulfilled', 'billed', 'pendingbilling'];
-  const statusLowerCase = status?.toLowerCase();
-
-  const isExist = statuses.filter((stat) => stat === statusLowerCase);
-  if (isExist.length === 0) statusText = status;
-  return statusText;
-};
-
-export default function NSOrderItems(nsItemDetails: any) {
-  const customerName = useAppSelector(
-    ({ company }) => `${company.customer.firstName} ${company.customer.lastName}`,
-  );
-  const companyName = useAppSelector(
-    ({ company }) => `${company?.companyInfo?.id}-${company?.companyInfo?.companyName}`,
-  );
-  const lineItem = nsItemDetails?.nsItemDetails?.lines;
-
+export default function NSOrderItems() {
   const [isMobile] = useMobile();
-  const itemStyle = isMobile ? mobileItemStyle : defaultItemStyle;
-
-  const b3Lang = useB3Lang();
+  const isRequestLoading = false;
 
   return (
-    <Stack spacing={2}>
-      <Card key={`shipping-${nsItemDetails?.nsItemDetails?.nsOrderInternalID}`}>
-        <CardContent>
-          <Box
+    <B3Spin isSpinning={isRequestLoading} background="rgba(255,255,255,0.2)">
+      <Box
+        sx={{
+          overflow: 'auto',
+          flex: 1,
+        }}
+      >
+        <Grid container spacing={2}>
+          <Grid
+            container
+            spacing={2}
             sx={{
-              wordBreak: 'break-word',
-              color: 'rgba(0, 0, 0, 0.87)',
+              marginTop: '0',
+              overflow: 'auto',
+              flexWrap: isMobile ? 'wrap' : 'nowrap',
+              paddingBottom: '20px',
             }}
           >
-            <Typography
-              variant="h6"
-              sx={{
-                fontSize: '24px',
-                fontWeight: '400',
-              }}
+            <Grid
+              item
+              sx={
+                isMobile
+                  ? {
+                      flexBasis: '100%',
+                    }
+                  : {
+                      flexBasis: '690px',
+                      flexGrow: 1,
+                    }
+              }
             >
-              {customerName}
-              {' – '}
-              {companyName}
-            </Typography>
-            <Typography
-              variant="h6"
-              sx={{
-                fontSize: '15px',
-                fontWeight: '700',
-                color: '#c12126',
-                fontStyle: 'italic',
-              }}
+              <Stack spacing={4}>
+                <NSOrderItemList />
+              </Stack>
+            </Grid>
+            <Grid
+              item
+              sx={
+                isMobile
+                  ? {
+                      flexBasis: '100%',
+                    }
+                  : {
+                      flexBasis: '340px',
+                    }
+              }
             >
-              {statusNotes(nsItemDetails?.nsItemDetails?.status)
-                ? b3Lang('purchasedProducts.error.rmaCannotProcessReturn', {
-                    status: nsItemDetails?.nsItemDetails?.status,
-                  })
-                : ''}
-            </Typography>
-          </Box>
-          <Fragment key={`shipment-${nsItemDetails?.nsItemDetails?.nsOrderInternalID}`}>
-            <Box
-              sx={{
-                margin: '20px 0 2px',
-              }}
-            />
-
-            <Box sx={{ borderBottom: '1px solid #D9DCE9', paddingBottom: '20px' }}>
-              <Flex isHeader isMobile={isMobile}>
-                <FlexItem padding={isMobile ? '0' : '0 6% 0 1%'}>
-                  <ProductHead>{b3Lang('global.searchProduct.product')}</ProductHead>
-                </FlexItem>
-                <FlexItem textAlignLocation="center" {...itemStyle.default}>
-                  <ProductHead>{b3Lang('global.searchProduct.qty')}</ProductHead>
-                </FlexItem>
-                <FlexItem textAlignLocation="center" {...itemStyle.qty}>
-                  <ProductHead>{b3Lang('global.searchProduct.returnable')}</ProductHead>
-                </FlexItem>
-                <FlexItem textAlignLocation="center" {...itemStyle.default}>
-                  <ProductHead>{b3Lang('global.searchProduct.fulfilled')}</ProductHead>
-                </FlexItem>
-              </Flex>
-
-              {lineItem &&
-                lineItem.length > 0 &&
-                lineItem.map((item: any) => (
-                  <Flex isMobile={isMobile} key={item.lineKey}>
-                    <FlexItem padding={isMobile ? '0' : '0 6% 0 0'}>
-                      <ProductImage src={item?.bcData?.images || PRODUCT_DEFAULT_IMAGE} />
-                      <Box
-                        sx={{
-                          marginLeft: '16px',
-                        }}
-                      >
-                        <Typography
-                          variant="body1"
-                          color="#212121"
-                          sx={{
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {item?.bcData?.name || item?.descr}
-                        </Typography>
-                        <Typography variant="body1" color="#616161">
-                          {item?.sku}
-                        </Typography>
-                      </Box>
-                    </FlexItem>
-
-                    <FlexItem
-                      padding=""
-                      {...itemStyle.default}
-                      sx={
-                        isMobile
-                          ? {
-                              fontSize: '14px',
-                              justifyContent: 'left',
-                            }
-                          : {
-                              justifyContent: 'center',
-                            }
-                      }
-                    >
-                      {isMobile && <span>{`${b3Lang('global.searchProduct.qty')} : `} </span>}{' '}
-                      {item?.quantity}
-                    </FlexItem>
-
-                    <FlexItem
-                      {...itemStyle.qty}
-                      sx={
-                        isMobile
-                          ? {
-                              fontSize: '14px',
-                              justifyContent: 'left',
-                            }
-                          : {
-                              justifyContent: 'center',
-                            }
-                      }
-                    >
-                      {isMobile && (
-                        <span>{`${b3Lang('global.searchProduct.returnable')} : `} </span>
-                      )}{' '}
-                      {item?.returnableQuantity}
-                    </FlexItem>
-
-                    <FlexItem
-                      padding=""
-                      {...itemStyle.default}
-                      sx={
-                        isMobile
-                          ? {
-                              fontSize: '14px',
-                              justifyContent: 'left',
-                            }
-                          : {
-                              justifyContent: 'center',
-                            }
-                      }
-                    >
-                      {isMobile && <span>{`${b3Lang('global.searchProduct.fulfilled')} : `} </span>}{' '}
-                      {item?.fulfilled}
-                    </FlexItem>
-                  </Flex>
-                ))}
-            </Box>
-            <Box
-              sx={{
-                margin: '20px 0 2px',
-                display: 'flex',
-                justifyContent: 'right',
-              }}
-            >
-              <OrderAction itemDetails={nsItemDetails?.nsItemDetails} />
-            </Box>
-          </Fragment>
-        </CardContent>
-      </Card>
-    </Stack>
+              <OrderOtherDetails />
+            </Grid>
+          </Grid>
+        </Grid>
+      </Box>
+    </B3Spin>
   );
 }
