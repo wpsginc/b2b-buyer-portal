@@ -36,7 +36,7 @@ import {
   getBCAllOrders,
   getBCOrderDetails,
   getBcOrderStatusType,
-  getNSOrders,
+  getCustomData,
   getOrdersCreatedByUser,
   getOrderStatusType,
 } from './graphql/orders';
@@ -243,7 +243,7 @@ export {
   validateAddressExtraFields,
   validateBCCompanyExtraFields,
   validateBCCompanyUserExtraFields,
-  getNSOrders,
+  getCustomData,
 };
 
 export { default as getTranslation } from './api/translation';

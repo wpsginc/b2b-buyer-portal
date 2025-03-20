@@ -67,7 +67,7 @@ const ProductHead = styled('div')(() => ({
 }));
 
 const ProductImage = styled('img')(() => ({
-  width: '60px',
+  width: '45px',
   borderRadius: '4px',
   flexShrink: 0,
 }));

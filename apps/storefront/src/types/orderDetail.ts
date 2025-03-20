@@ -81,19 +81,34 @@ export interface EditableQty extends OrderItemList {
 export interface OrderItemList {
   lineKey: number;
   itemInternalID: number;
-  sku: string | string;
+  sku: string;
   descr: string;
-  quantity: number;
+  quantity: string;
   returnableQuantity: number;
-  fulfilled: number;
+  fulfilled: string;
+  productSku: string;
   bcData: BCItemData;
 }
-
 export interface BCItemData {
   id: number;
   sku: string;
   name: string;
   images: string;
+}
+
+export interface InvoiceDetailList {
+  lineKey: number;
+  itemInternalID: number;
+  sku: string;
+  descr: string;
+  quantity: string;
+  rate: string;
+  amount: string;
+}
+
+export interface CustomInvoiceList {
+  invNumber: string;
+  invID: string;
 }
 export interface OrderShipmentProductItem {
   order_product_id: number;

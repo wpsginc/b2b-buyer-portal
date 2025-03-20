@@ -172,7 +172,7 @@ const getCreatedByUser = (companyId: number, module: number, fn: string) => `{
   }
 }`;
 
-export const getNSOrders = (data: any) => B3Request.nsBackend(data);
+export const getCustomData = (data: any) => B3Request.nsBackend(data);
 
 export const getNSReturnDetails = (data: any) => B3Request.nsBackend(data);
 

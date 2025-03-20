@@ -26,6 +26,10 @@ export const orderStatusCode: OrderStatusConfig = {
   21: 'Billed',
   22: 'closed',
   23: 'cancelled',
+  24: 'open',
+  25: 'paidInFull',
+  26: 'rejected',
+  27: 'voided',
 };
 
 const orderStatusColor: OrderStatusConfig = {
@@ -53,6 +57,11 @@ const orderStatusColor: OrderStatusConfig = {
   Billed: '#C4DD6C',
   closed: '#000000',
   cancelled: '#000000',
+  Open: '#899193',
+  'Paid In Full': '#C4DD6C',
+  Rejected: '#000000',
+  Voided: '#000000',
+  'Pending Approval': '#899193',
 };
 
 const orderStatusTextColor: OrderStatusConfig = {
@@ -80,6 +89,11 @@ const orderStatusTextColor: OrderStatusConfig = {
   Billed: '#FFFFFF',
   closed: '#FFFFFF',
   cancelled: '#FFFFFF',
+  Open: '#FFFFFF',
+  'Paid In Full': '#FFFFFF',
+  Rejected: '#FFFFFF',
+  Voided: '#FFFFFF',
+  'Pending Approval': '#FFFFFF',
 };
 
 // i18n
@@ -108,6 +122,11 @@ const orderStatusText: OrderStatusConfig = {
   Billed: 'Billed',
   closed: 'Closed',
   cancelled: 'Cancelled',
+  Open: 'Open',
+  'Paid In Full': 'Paid In Full',
+  Rejected: 'Rejected',
+  Voided: 'Voided',
+  'Pending Approval': 'Pending Approval',
 };
 
 export const orderStatusTranslationVariables: OrderStatusConfig = {
@@ -135,6 +154,11 @@ export const orderStatusTranslationVariables: OrderStatusConfig = {
   Billed: 'ns-orders.status.billed',
   closed: 'ns-orders.status.closed',
   cancelled: 'orders.status.cancelled',
+  Open: 'invoice.status.open',
+  'Paid In Full': 'invoice.status.paidInFull',
+  Rejected: 'invoice.status.rejected',
+  Voided: 'invoice.status.voided',
+  'Pending Approval': 'invoice.status.pendingApproval',
 };
 
 export const getOrderStatusOptions = () =>

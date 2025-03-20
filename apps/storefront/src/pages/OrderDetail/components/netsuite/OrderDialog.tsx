@@ -15,6 +15,7 @@ import b2bLogger from '@/utils/b3Logger';
 import { EditableQty, OrderItemList } from '../../../../types';
 
 import getReturnFormFields from './config';
+import InvoiceDetails from './InvoiceDetails';
 import OrderCheckboxProduct from './OrderCheckboxProduct';
 
 interface ReturnListProps {
@@ -62,7 +63,7 @@ export default function OrderDialog({
   const [isMobile] = useMobile();
   const location = useLocation();
 
-  const isCompanyOrder = !!(location.state as LocationState).isCompanyOrder;
+  const isCompanyOrder = !!(location.state as LocationState)?.isCompanyOrder;
   const customer_company_id = isCompanyOrder && isB2BUser && companyId ? companyId : customerId;
 
   const {
@@ -100,6 +101,7 @@ export default function OrderDialog({
           customer_id: customer_company_id,
           return_reason: returnReason?.return_reason,
           line_items: returnArr,
+          submitType: 'create-returns',
         },
       ];
 
@@ -142,10 +144,15 @@ export default function OrderDialog({
   };
 
   const handleSaveClick = () => {
-    if (checkedArr.length === 0) {
-      snackbar.error(b3Lang('purchasedProducts.error.selectOneItem'));
-    } else if (type === 'return') {
-      handleReturn();
+    if (type === 'return') {
+      if (checkedArr.length === 0) {
+        snackbar.error(b3Lang('purchasedProducts.error.selectOneItem'));
+      } else if (type === 'return') {
+        handleReturn();
+      }
+    } else {
+      setIsRequestLoading(false);
+      handleClose();
     }
   };
 
@@ -162,6 +169,10 @@ export default function OrderDialog({
   const handleProductChange = (products: EditableQty[]) => {
     setEditableProducts(products);
   };
+
+  const areAllReturnableZero = editableProducts.every(
+    (product) => product.returnableQuantity === 0,
+  );
 
   return (
     <Box
@@ -180,24 +191,31 @@ export default function OrderDialog({
         maxWidth="md"
         loading={isRequestLoading}
       >
-        <Typography
-          sx={{
-            margin: isMobile ? '0 0 1rem' : '1rem 0',
-          }}
-        >
-          {currentDialogData?.description || ''}
-        </Typography>
-        <OrderCheckboxProduct
-          products={editableProducts}
-          onProductChange={handleProductChange}
-          setCheckedArr={setCheckedArr}
-          setReturnArr={setReturnArr}
-          textAlign={isMobile ? 'left' : 'right'}
-          type={type}
-        />
+        {type === 'return' && areAllReturnableZero && (
+          <Typography variant="body1" color="#c12126" fontSize={15}>
+            {b3Lang('purchasedProducts.error.rmaNoAvailableItem')}
+          </Typography>
+        )}
 
-        {type === 'return' && (
+        {type === 'return' && !areAllReturnableZero && (
           <>
+            <Typography
+              sx={{
+                margin: isMobile ? '0 0 1rem' : '1rem 0',
+              }}
+            >
+              {currentDialogData?.description || ''}
+            </Typography>
+
+            <OrderCheckboxProduct
+              products={editableProducts}
+              onProductChange={handleProductChange}
+              setCheckedArr={setCheckedArr}
+              setReturnArr={setReturnArr}
+              textAlign={isMobile ? 'left' : 'right'}
+              type={type}
+            />
+
             <Typography
               variant="body1"
               sx={{
@@ -215,6 +233,8 @@ export default function OrderDialog({
             />
           </>
         )}
+
+        {type === 'invoice' && <InvoiceDetails nsInternalId={orderId.toString()} />}
       </B3Dialog>
     </Box>
   );
