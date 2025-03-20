@@ -106,11 +106,11 @@ function OrderDetail() {
 
     if (params?.id?.includes('ns-')) {
       paramId = params?.id?.split('-')[1];
+      setNSInternalID(paramId);
     } else {
       paramId = params.id || '';
+      setOrderId(paramId);
     }
-
-    setNSInternalID(paramId);
   }, [params]);
 
   useEffect(() => {
@@ -158,8 +158,7 @@ function OrderDetail() {
   useEffect(() => {
     if (orderId) {
       const getOrderDetails = async () => {
-        const testid = '108';
-        const id = parseInt(testid, 10);
+        const id = parseInt(orderId, 10);
 
         if (!id) {
           return;
