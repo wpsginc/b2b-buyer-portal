@@ -20,7 +20,7 @@ import { useMobile } from '@/hooks';
 import OrderStatus from '@/pages/order/components/OrderStatus';
 import OrderDialog from '@/pages/OrderDetail/components/netsuite/OrderDialog';
 import { getCustomData } from '@/shared/service/b2b';
-import { useAppSelector } from '@/store';
+import { isB2BUserSelector, useAppSelector } from '@/store';
 
 const headCells = [
   {
@@ -120,6 +120,8 @@ function CustomInvoice() {
   const [isMobile] = useMobile();
   const b3Lang = useB3Lang();
   const customerId = useAppSelector(({ company }) => company.customer.id);
+  const isB2BUser = useAppSelector(isB2BUserSelector);
+  const companyB2BId = useAppSelector(({ company }) => company.companyInfo.id);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [totalInvoices, setTotalInvoices] = useState(0);
@@ -144,7 +146,7 @@ function CustomInvoice() {
       const data = [
         {
           order_id: 0,
-          customer_id: customerId.toString(),
+          customer_id: isB2BUser ? companyB2BId.toString() : customerId.toString(),
           return_reason: [],
           line_items: [],
           invID: 0,
@@ -164,7 +166,7 @@ function CustomInvoice() {
     };
 
     loadInvoices();
-  }, [customerId]);
+  }, [customerId, companyB2BId, isB2BUser]);
 
   const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - totalInvoices) : 0;
 
