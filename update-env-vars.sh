@@ -24,7 +24,7 @@ B2B_GD_LOGO="https://store-lnvrhcdjaz.mybigcommerce.com/content/gideontactical.p
 
 # Define the base URL for assets
 ASSETS_BASE_URL="https://buyersportal.z13.web.core.windows.net/BPE"
-ASSETS_ABSOLUTE_PATH="'${ASSETS_BASE_URL}/${VERSION}/assets/'"
+ASSETS_ABSOLUTE_PATH="'${ASSETS_BASE_URL}/${VERSION}/'"
 echo $ASSETS_BASE_URL
 
 # Create a temporary file
@@ -81,10 +81,10 @@ echo "Created new .env file with version ${VERSION}"
 
 # Run yarn commands - script will stop if any command fails due to set -e
 echo "Running yarn lint..."
-#yarn lint
+yarn lint
 
 echo "Running yarn format..."
-#yarn format
+yarn format
 
 echo "Running yarn build..."
-#yarn build
+yarn build
