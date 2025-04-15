@@ -12,7 +12,7 @@ import { getContrastColor } from '@/components/outSideComponents/utils/b3CustomS
 import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import { useAppSelector } from '@/store';
 import { channelId, loginJump, storeHash } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
@@ -36,7 +36,6 @@ import {
   getAccountFormFields,
   RegisterFieldsItems,
   State,
-  steps,
   toHump,
 } from '../Registered/config';
 import { RegisteredContext } from '../Registered/context/RegisteredContext';
@@ -91,7 +90,7 @@ export default function RegisteredBCToB2B(props: PageProps) {
 
   const {
     state: { storeName, logo, blockPendingAccountOrderCreation, registerEnabled },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const navigate = useNavigate();
 
@@ -242,9 +241,11 @@ export default function RegisteredBCToB2B(props: PageProps) {
         if (stateList.length > 0) {
           stateFields.fieldType = 'dropdown';
           stateFields.options = stateList;
+          stateFields.required = true;
         } else {
           stateFields.fieldType = 'text';
           stateFields.options = [];
+          stateFields.required = false;
         }
       }
 
@@ -640,13 +641,13 @@ export default function RegisteredBCToB2B(props: PageProps) {
                     window.location.href = '/';
                   }}
                 >
-                  <img src={`${logo}`} alt={b3Lang('global.tips.registerLogo')} loading="lazy" />
+                  <img src={logo} alt={b3Lang('global.tips.registerLogo')} loading="lazy" />
                 </ImageListItem>
               </RegisteredImage>
             )}
 
             {showFinishPage ? (
-              <RegisteredFinish activeStep={steps.length} handleFinish={handleFinish} isBCToB2B />
+              <RegisteredFinish handleFinish={handleFinish} isBCToB2B />
             ) : (
               <StyledRegisterContent
                 sx={{

@@ -90,7 +90,7 @@ export const setMediaStyle = (mediaBlocks: string[], className: string) => {
         newValue = value.replace(';', '!important;');
       }
 
-      return newValue?.trim() ? `${property}: ${newValue}` : `${property}`;
+      return newValue?.trim() ? `${property}: ${newValue}` : property;
     });
 
     const newMedia = newMediaArr.join('\n');
@@ -115,7 +115,7 @@ export const setMediaStyle = (mediaBlocks: string[], className: string) => {
 };
 
 export const setMUIMediaStyle = (mediaBlocks: string[]) => {
-  if (mediaBlocks.length === 0) return [];
+  if (mediaBlocks.length === 0) return {};
   const newMedia: CustomFieldItems = {};
   mediaBlocks.forEach((media: string) => {
     const mediaArr = media.split('\n');

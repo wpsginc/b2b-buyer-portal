@@ -15,7 +15,7 @@ import {
   getBcVariantInfoBySkus,
 } from '@/shared/service/b2b';
 import { isB2BUserSelector, useAppSelector } from '@/store';
-import { baseUrl, snackbar } from '@/utils';
+import { BigCommerceStorefrontAPIBaseURL, snackbar } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 import b3TriggerCartNumber from '@/utils/b3TriggerCartNumber';
 import { callCart } from '@/utils/cartUtils';
@@ -126,7 +126,7 @@ export default function OrderDialog({
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
       },
-      referrer: `${baseUrl}/account.php?action=new_return&order_id=${orderId}`,
+      referrer: `${BigCommerceStorefrontAPIBaseURL}/account.php?action=new_return&order_id=${orderId}`,
       body: urlencoded,
       mode: 'no-cors',
     };
@@ -134,7 +134,7 @@ export default function OrderDialog({
     try {
       setIsRequestLoading(true);
       const returnResult = await fetch(
-        `${baseUrl}/account.php?action=save_new_return`,
+        `${BigCommerceStorefrontAPIBaseURL}/account.php?action=save_new_return`,
         requestOptions,
       );
       if (returnResult.status === 200 && returnResult.url.includes('saved_new_return')) {
@@ -308,9 +308,9 @@ export default function OrderDialog({
         } = product;
 
         return {
-          productId: +productId,
+          productId: Number(productId),
           variantId,
-          quantity: +editQuantity,
+          quantity: Number(editQuantity),
           optionList: productOptions.map((option) => {
             const { product_option_id: optionId, value: optionValue } = option;
 
@@ -321,12 +321,12 @@ export default function OrderDialog({
           }),
         };
       });
-      const params = items.filter((item) => checkedArr.includes(+item.variantId));
+      const params = items.filter((item) => checkedArr.includes(Number(item.variantId)));
 
       const addToShoppingList = isB2BUser ? addProductToShoppingList : addProductToBcShoppingList;
 
       await addToShoppingList({
-        shoppingListId: +id,
+        shoppingListId: Number(id),
         items: params,
       });
 
@@ -430,7 +430,7 @@ export default function OrderDialog({
                   margin: '20px 0',
                 }}
               >
-                {b3Lang('purchasedProducts.orderDialog.aditionalInformation')}
+                {b3Lang('purchasedProducts.orderDialog.additionalInformation')}
               </Typography>
               <B3CustomForm
                 formFields={returnFormFields}

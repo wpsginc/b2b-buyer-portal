@@ -62,7 +62,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
       products.forEach((item, index) => {
         returnIds[index] = {
           lineKey: item.lineKey,
-          quantityToReturn: +item.editQuantity,
+          quantityToReturn: Number(item.editQuantity),
           returnableQty: item.returnableQuantity,
         };
       });
@@ -98,21 +98,21 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
     (product: EditableQty) => (e: ChangeEvent<HTMLInputElement>) => {
       const element = product;
       const valueNum = e.target.value;
-      if (+valueNum >= 0 && +valueNum <= 1000000) {
+      if (Number(valueNum) >= 0 && Number(valueNum) <= 1000000) {
         element.editQuantity = valueNum;
         if (type === 'return') {
-          if (+valueNum > +product.quantity) {
+          if (Number(valueNum) > Number(product.quantity)) {
             element.editQuantity = product.returnableQuantity;
             snackbar.error(
               b3Lang('purchasedProducts.error.returnedQuantityShouldBeWithinThePurchase'),
             );
-          } else if (+valueNum > product.returnableQuantity) {
+          } else if (Number(valueNum) > product.returnableQuantity) {
             snackbar.error(b3Lang('purchasedProducts.error.rmaReturnableQty'));
 
             returnList.forEach((listItem) => {
               const item = listItem;
               if (item.lineKey === product.lineKey) {
-                item.quantityToReturn = +valueNum;
+                item.quantityToReturn = Number(valueNum);
               }
             });
             setReturnArr(returnList);
@@ -120,7 +120,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
             returnList.forEach((listItem) => {
               const item = listItem;
               if (item.lineKey === product.lineKey) {
-                item.quantityToReturn = +valueNum;
+                item.quantityToReturn = Number(valueNum);
               }
             });
             setReturnArr(returnList);
@@ -205,7 +205,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
             onChange={() =>
               handleSelectChange(
                 productFilter.lineKey,
-                +productFilter.editQuantity,
+                Number(productFilter.editQuantity),
                 productFilter.returnableQuantity,
               )
             }

@@ -1,12 +1,12 @@
 import Cookies from 'js-cookie';
 
 import { store } from '@/store';
-import { baseUrl, channelId, snackbar, storeHash } from '@/utils';
+import { BigCommerceStorefrontAPIBaseURL, channelId, snackbar, storeHash } from '@/utils';
 import { encrypt } from '@/utils/customUtils';
 
 import {
-  B2B_BASIC_URL,
   ENCRYPTIONSECRET,
+  getAPIBaseURL,
   NS_BACKEND,
   NS_TOKEN,
   queryParse,
@@ -18,17 +18,17 @@ import b3Fetch from './fetch';
 
 const GraphqlEndpointsFn = (type: RequestTypeKeys): string => {
   const GraphqlEndpoints: CustomFieldStringItems = {
-    B2BGraphql: `${B2B_BASIC_URL}/graphql`,
-    BCGraphql: `${baseUrl}/graphql`,
-    BCProxyGraphql: `${B2B_BASIC_URL}/api/v3/proxy/bc-storefront/graphql`,
     NSBackend: NS_BACKEND,
+    B2BGraphql: `${getAPIBaseURL()}/graphql`,
+    BCGraphql: `${BigCommerceStorefrontAPIBaseURL}/graphql`,
+    BCProxyGraphql: `${getAPIBaseURL()}/api/v3/proxy/bc-storefront/graphql`,
   };
 
   return GraphqlEndpoints[type] || '';
 };
 
 function request(path: string, config?: RequestInit, type?: RequestTypeKeys) {
-  const url = RequestType.B2BRest === type ? `${B2B_BASIC_URL}${path}` : path;
+  const url = RequestType.B2BRest === type ? `${getAPIBaseURL()}${path}` : path;
   const { B2BToken } = store.getState().company.tokens;
   const getToken: HeadersInit =
     type === RequestType.BCRest
@@ -36,7 +36,7 @@ function request(path: string, config?: RequestInit, type?: RequestTypeKeys) {
           'x-xsrf-token': Cookies.get('XSRF-TOKEN') ?? '',
         }
       : {
-          authToken: `${B2BToken}`,
+          authToken: B2BToken,
         };
 
   const {
@@ -121,6 +121,11 @@ interface B2bGQLResponse {
   }>;
 }
 
+export interface B2BRequest {
+  query: string;
+  variables?: any;
+}
+
 const B3Request = {
   nsBackend: function post(data: any): Promise<any> {
     const config = {
@@ -134,7 +139,10 @@ const B3Request = {
   /** 
 Request to B2B graphql API using B2B token
    */
-  graphqlB2B: function post<T>(data: T, customMessage = false): Promise<any> {
+  graphqlB2B: function post<T = CustomFieldItems>(
+    data: B2BRequest,
+    customMessage = false,
+  ): Promise<T> {
     const { B2BToken } = store.getState().company.tokens;
     const config = {
       Authorization: `Bearer  ${B2BToken}`,
@@ -148,7 +156,7 @@ Request to B2B graphql API using B2B token
 
       if (extensions?.code === 40101) {
         if (window.location.hash.startsWith('#/')) {
-          window.location.href = '#/login?loginFlag=3&showTip=false';
+          window.location.href = '#/login?loginFlag=loggedOutLogin&showTip=false';
         }
 
         if (message) {
@@ -264,7 +272,7 @@ Request to B2B graphql API using B2B token
     formData: T,
     config?: Y,
   ): Promise<any> {
-    return request(`${B2B_BASIC_URL}${url}`, {
+    return request(`${getAPIBaseURL()}${url}`, {
       method: 'POST',
       body: formData,
       headers: {},

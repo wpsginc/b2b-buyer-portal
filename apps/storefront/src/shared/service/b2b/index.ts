@@ -1,5 +1,5 @@
 import validateAddressExtraFields from './api/address';
-import { setChannelStoreType, uploadB2BFile } from './api/global';
+import { setChannelStoreType, uploadB2BFile, validateQuoteExtraFields } from './api/global';
 import { validateBCCompanyExtraFields, validateBCCompanyUserExtraFields } from './api/register';
 import {
   createB2BAddress,
@@ -14,17 +14,22 @@ import {
   updateBcAddress,
 } from './graphql/address';
 import {
+  endUserMasqueradingCompany,
   getAgentInfo,
   getB2BToken,
   getBcCurrencies,
   getCompanyCreditConfig,
+  getCompanySubsidiaries,
   getCurrencies,
   getProductPricing,
+  getStoreConfigsSwitchStatus,
   getStorefrontConfig,
   getStorefrontConfigs,
   getStorefrontDefaultLanguages,
   getTaxZoneRates,
   getUserCompany,
+  getUserMasqueradingCompany,
+  startUserMasqueradingCompany,
   superAdminBeginMasquerade,
   superAdminCompanies,
   superAdminEndMasquerade,
@@ -65,6 +70,7 @@ import {
   getBCQuotesList,
   getBCStorefrontProductSettings,
   getQuoteCreatedByUsers,
+  getQuoteExtraFieldsConfig,
   quoteDetailAttachFileCreate,
   quoteDetailAttachFileDelete,
   updateB2BQuote,
@@ -136,7 +142,7 @@ export {
   getInvoiceStats,
   invoiceDownloadPDF,
 } from './graphql/invoice';
-export { getBcOrderedProducts, getOrderedProducts } from './graphql/quickorder';
+export { getBcOrderedProducts, getOrderedProducts } from './graphql/quickOrder';
 
 export {
   addOrUpdateUsers,
@@ -205,15 +211,21 @@ export {
   getBcShoppingList,
   getBcShoppingListDetails,
   getBCStoreChannelId,
+  getCompanySubsidiaries,
+  startUserMasqueradingCompany,
+  endUserMasqueradingCompany,
+  getUserMasqueradingCompany,
   getBcVariantInfoBySkus,
   getCompanyCreditConfig,
   getCurrencies,
   getOrdersCreatedByUser,
   getOrderStatusType,
   getQuoteCreatedByUsers,
+  getQuoteExtraFieldsConfig,
   getShoppingListsCreatedByUser,
   getStorefrontConfig,
   getStorefrontConfigs,
+  getStoreConfigsSwitchStatus,
   getStorefrontDefaultLanguages,
   getTaxZoneRates,
   getUserCompany,
@@ -244,6 +256,7 @@ export {
   validateBCCompanyExtraFields,
   validateBCCompanyUserExtraFields,
   getCustomData,
+  validateQuoteExtraFields,
 };
 
 export { default as getTranslation } from './api/translation';

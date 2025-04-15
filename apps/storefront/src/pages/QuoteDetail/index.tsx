@@ -8,7 +8,7 @@ import { get } from 'lodash-es';
 import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
 import useScrollBar from '@/hooks/useScrollBar';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   exportB2BQuotePdf,
   exportBcQuotePdf,
@@ -24,8 +24,9 @@ import {
   TaxZoneRates,
   useAppSelector,
 } from '@/store';
-import { Currency } from '@/types';
-import { snackbar } from '@/utils';
+import { QuoteExtraFieldsData } from '@/types/quotes';
+import { snackbar, verifyLevelPermission } from '@/utils';
+import { b2bPermissionsMap } from '@/utils/b3CheckPermissions/config';
 import { getVariantInfoOOSAndPurchase } from '@/utils/b3Product/b3Product';
 import { conversionProductsList } from '@/utils/b3Product/shared/config';
 import { getSearchVal } from '@/utils/loginInfo';
@@ -40,34 +41,129 @@ import QuoteInfo from '../quote/components/QuoteInfo';
 import QuoteNote from '../quote/components/QuoteNote';
 import QuoteTermsAndConditions from '../quote/components/QuoteTermsAndConditions';
 import { ProductInfoProps } from '../quote/shared/config';
+import getB2BQuoteExtraFields from '../quote/utils/getQuoteExtraFields';
 import { handleQuoteCheckout } from '../quote/utils/quoteCheckout';
 
-function QuoteDetail() {
+function useData() {
   const { id = '' } = useParams();
-  const navigate = useNavigate();
 
   const {
     state: { bcLanguage, quoteConfig },
-  } = useContext(GlobaledContext);
-
-  const isB2BUser = useAppSelector(isB2BUserSelector);
-  const companyInfoId = useAppSelector(({ company }) => company.companyInfo.id);
+  } = useContext(GlobalContext);
+  const companyId = useAppSelector(({ company }) => company.companyInfo.id);
   const emailAddress = useAppSelector(({ company }) => company.customer.emailAddress);
   const customerGroupId = useAppSelector(({ company }) => company.customer.customerGroupId);
   const role = useAppSelector(({ company }) => company.customer.role);
 
+  const isB2BUser = useAppSelector(isB2BUserSelector);
+  const { selectCompanyHierarchyId } = useAppSelector(
+    ({ company }) => company.companyHierarchyInfo,
+  );
+
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
-  const [isMobile] = useMobile();
+
+  const { currency_code: currencyCode } = useAppSelector(activeCurrencyInfoSelector);
+  const taxZoneRates = useAppSelector(({ global }) => global.taxZoneRates);
+  const enteredInclusiveTax = useAppSelector(
+    ({ storeConfigs }) => storeConfigs.currencies.enteredInclusiveTax,
+  );
+  const isEnableProduct = useAppSelector(
+    ({ global }) => global.blockPendingQuoteNonPurchasableOOS?.isEnableProduct,
+  );
+
+  const { purchasabilityPermission } = useAppSelector(rolePermissionSelector);
+
+  const handleGetProductsById = async (listProducts: ProductInfoProps[]) => {
+    if (listProducts.length > 0) {
+      const productIds: number[] = [];
+
+      listProducts.forEach((item) => {
+        if (!productIds.includes(item.productId)) {
+          productIds.push(item.productId);
+        }
+      });
+
+      const options = { productIds, currencyCode, companyId, customerGroupId };
+
+      const { productsSearch } = await (isB2BUser
+        ? searchB2BProducts(options)
+        : searchBcProducts(options));
+
+      const newProductsSearch = conversionProductsList(productsSearch);
+
+      listProducts.forEach((item) => {
+        const listProduct = item;
+        const productInfo = newProductsSearch.find((search: CustomFieldItems) => {
+          const { id: productId } = search;
+
+          return Number(item.productId) === Number(productId);
+        });
+
+        listProduct.productsSearch = productInfo || {};
+      });
+
+      return listProducts;
+    }
+    return undefined;
+  };
+
+  const location = useLocation();
+
+  const getQuote = async () => {
+    const { search } = location;
+
+    const date = getSearchVal(search, 'date') || '';
+    const data = {
+      id: Number(id),
+      date: date.toString(),
+    };
+
+    const { quote } = await (Number(role) === 99
+      ? getBcQuoteDetail(data)
+      : getB2BQuoteDetail(data));
+
+    return quote;
+  };
+
+  return {
+    id,
+    bcLanguage,
+    quoteConfig,
+    role,
+    emailAddress,
+    isB2BUser,
+    selectCompanyHierarchyId,
+    isAgenting,
+    taxZoneRates,
+    enteredInclusiveTax,
+    isEnableProduct,
+    purchasabilityPermission,
+    handleGetProductsById,
+    getQuote,
+  };
+}
+
+function QuoteDetail() {
+  const navigate = useNavigate();
 
   const {
-    quoteConvertToOrderPermission: quoteConvertToOrderPermissionRename,
+    id,
+    bcLanguage,
+    quoteConfig,
+    role,
+    emailAddress,
+    isB2BUser,
+    selectCompanyHierarchyId,
+    isAgenting,
+    taxZoneRates,
+    enteredInclusiveTax,
+    isEnableProduct,
     purchasabilityPermission,
-  } = useAppSelector(rolePermissionSelector);
+    handleGetProductsById,
+    getQuote,
+  } = useData();
 
-  const quoteConvertToOrderPermission = isB2BUser
-    ? quoteConvertToOrderPermissionRename
-    : +role !== 2;
-  const quotePurchasabilityPermission = isB2BUser ? purchasabilityPermission : +role !== 2;
+  const [isMobile] = useMobile();
 
   const b3Lang = useB3Lang();
 
@@ -93,17 +189,48 @@ function QuoteDetail() {
     nonPurchasable: '',
   });
 
-  const [quoteCheckoutLoadding, setQuoteCheckoutLoadding] = useState<boolean>(false);
+  const [quotePurchasabilityPermissionInfo, setQuotePurchasabilityPermission] = useState({
+    quotePurchasabilityPermission: false,
+    quoteConvertToOrderPermission: false,
+  });
+
+  const [quoteCheckoutLoading, setQuoteCheckoutLoading] = useState<boolean>(false);
 
   const location = useLocation();
-  const currency = useAppSelector(activeCurrencyInfoSelector);
-  const taxZoneRates = useAppSelector(({ global }) => global.taxZoneRates);
-  const enteredInclusiveTax = useAppSelector(
-    ({ storeConfigs }) => storeConfigs.currencies.enteredInclusiveTax,
-  );
-  const isEnableProduct = useAppSelector(
-    ({ global }) => global.blockPendingQuoteNonPurchasableOOS?.isEnableProduct,
-  );
+
+  useEffect(() => {
+    if (!quoteDetail?.id) return;
+
+    const { quoteConvertToOrderPermission: quoteCheckoutPermissionCode } = b2bPermissionsMap;
+
+    const getPurchasabilityAndConvertToOrderPermission = () => {
+      if (isB2BUser) {
+        const companyId = quoteDetail?.companyId?.id || null;
+        const userEmail = quoteDetail?.contactInfo?.email || '';
+        return {
+          quotePurchasabilityPermission: purchasabilityPermission,
+          quoteConvertToOrderPermission: verifyLevelPermission({
+            code: quoteCheckoutPermissionCode,
+            companyId,
+            userEmail,
+          }),
+        };
+      }
+
+      return {
+        quotePurchasabilityPermission: true,
+        quoteConvertToOrderPermission: true,
+      };
+    };
+
+    const { quotePurchasabilityPermission, quoteConvertToOrderPermission } =
+      getPurchasabilityAndConvertToOrderPermission();
+
+    setQuotePurchasabilityPermission({
+      quotePurchasabilityPermission,
+      quoteConvertToOrderPermission,
+    });
+  }, [isB2BUser, quoteDetail, selectCompanyHierarchyId, purchasabilityPermission]);
 
   useEffect(() => {
     let oosErrorList = '';
@@ -196,45 +323,24 @@ function QuoteDetail() {
     return 0;
   };
 
-  const handleGetProductsById = async (listProducts: ProductInfoProps[]) => {
-    if (listProducts.length > 0) {
-      const productIds: number[] = [];
+  const getQuoteExtraFields = async (currentExtraFields: QuoteExtraFieldsData[]) => {
+    const extraFieldsInfo = await getB2BQuoteExtraFields();
+    const quoteCurrentExtraFields: QuoteExtraFieldsData[] = [];
+    if (extraFieldsInfo.length) {
+      extraFieldsInfo.forEach((item) => {
+        const extraField = item;
+        const currentExtraField = currentExtraFields.find(
+          (field: QuoteExtraFieldsData) => field.fieldName === extraField.name,
+        );
 
-      listProducts.forEach((item) => {
-        if (!productIds.includes(item.productId)) {
-          productIds.push(item.productId);
-        }
+        quoteCurrentExtraFields.push({
+          fieldName: extraField.name || '',
+          fieldValue: currentExtraField?.fieldValue || extraField.default,
+        });
       });
-      const getProducts = isB2BUser ? searchB2BProducts : searchBcProducts;
-
-      try {
-        const { currency_code: currencyCode } = currency as Currency;
-        const { productsSearch } = await getProducts({
-          productIds,
-          currencyCode,
-          companyId: companyInfoId,
-          customerGroupId,
-        });
-
-        const newProductsSearch = conversionProductsList(productsSearch);
-
-        listProducts.forEach((item) => {
-          const listProduct = item;
-          const productInfo = newProductsSearch.find((search: CustomFieldItems) => {
-            const { id: productId } = search;
-
-            return +item.productId === +productId;
-          });
-
-          listProduct.productsSearch = productInfo || {};
-        });
-
-        return listProducts;
-      } catch (err: any) {
-        snackbar.error(err);
-      }
     }
-    return undefined;
+
+    return quoteCurrentExtraFields;
   };
 
   const getQuoteDetail = async () => {
@@ -242,20 +348,16 @@ function QuoteDetail() {
     setIsShowFooter(false);
 
     try {
-      const { search } = location;
+      const quote = await getQuote();
+      const productsWithMoreInfo = await handleGetProductsById(quote.productsList).catch(() => {
+        return undefined;
+      });
+      const quoteExtraFieldInfos = await getQuoteExtraFields(quote.extraFields);
 
-      const date = getSearchVal(search, 'date') || '';
-      const data = {
-        id: +id,
-        date: date.toString(),
-      };
-
-      const fn = +role === 99 ? getBcQuoteDetail : getB2BQuoteDetail;
-
-      const { quote } = await fn(data);
-      const productsWithMoreInfo = await handleGetProductsById(quote.productsList);
-
-      setQuoteDetail(quote);
+      setQuoteDetail({
+        ...quote,
+        extraFields: quoteExtraFieldInfos,
+      });
       setQuoteSummary({
         originalSubtotal: quote.subtotal,
         discount: quote.discount,
@@ -265,8 +367,8 @@ function QuoteDetail() {
       });
       setProductList(productsWithMoreInfo);
 
-      if (+quote.shippingTotal === 0) {
-        setQuoteDetailTax(+quote.taxTotal);
+      if (Number(quote.shippingTotal) === 0) {
+        setQuoteDetailTax(Number(quote.taxTotal));
       } else {
         let taxPrice = 0;
         productsWithMoreInfo?.forEach((product) => {
@@ -278,8 +380,8 @@ function QuoteDetail() {
 
           const taxRate = getTaxRate(taxClassId, variants);
           taxPrice += enteredInclusiveTax
-            ? ((+offeredPrice * taxRate) / (1 + taxRate)) * +quantity
-            : +offeredPrice * taxRate * +quantity;
+            ? ((Number(offeredPrice) * taxRate) / (1 + taxRate)) * Number(quantity)
+            : Number(offeredPrice) * taxRate * Number(quantity);
         });
 
         setQuoteDetailTax(taxPrice);
@@ -337,13 +439,13 @@ function QuoteDetail() {
     const { id, createdAt } = quoteDetail;
     try {
       const data = {
-        quoteId: +id,
+        quoteId: Number(id),
         createdAt,
         isPreview: bool,
         lang: bcLanguage,
       };
 
-      const fn = +role === 99 ? exportBcQuotePdf : exportB2BQuotePdf;
+      const fn = Number(role) === 99 ? exportBcQuotePdf : exportB2BQuotePdf;
 
       const quotePdf = await fn(data);
 
@@ -400,8 +502,8 @@ function QuoteDetail() {
       allProductsList = quote?.productsList || [];
     }
 
-    const startIndex = +params.offset;
-    const endIndex = +params.first + startIndex;
+    const startIndex = Number(params.offset);
+    const endIndex = Number(params.first) + startIndex;
 
     if (!allProductsList.length) {
       return {
@@ -433,13 +535,13 @@ function QuoteDetail() {
             mr: '15px',
           }}
         >
-          {+role === 100
+          {Number(role) === 100
             ? b3Lang('quoteDetail.submittedQuote')
             : b3Lang('quoteDetail.quoteSubmitted')}
         </Box>
         <Button
           onClick={() => {
-            if (+role === 100) {
+            if (Number(role) === 100) {
               copy(window.location.href);
               snackbar.success(b3Lang('quoteDetail.copySuccessful'));
             } else {
@@ -453,7 +555,7 @@ function QuoteDetail() {
             padding: 0,
           }}
         >
-          {+role === 100
+          {Number(role) === 100
             ? b3Lang('quoteDetail.copyQuoteLink')
             : b3Lang('quoteDetail.reviewAllQuotes')}
         </Button>
@@ -473,7 +575,7 @@ function QuoteDetail() {
 
   const quoteGotoCheckout = async () => {
     try {
-      setQuoteCheckoutLoadding(true);
+      setQuoteCheckoutLoading(true);
       await handleQuoteCheckout({
         quoteId: id,
         proceedingCheckoutFn,
@@ -482,7 +584,7 @@ function QuoteDetail() {
         navigate,
       });
     } finally {
-      setQuoteCheckoutLoadding(false);
+      setQuoteCheckoutLoading(false);
     }
   };
   useEffect(() => {
@@ -512,10 +614,31 @@ function QuoteDetail() {
     return true;
   };
 
+  const quoteAndExtraFieldsInfo = useMemo(() => {
+    const currentExtraFields = quoteDetail?.extraFields?.map(
+      (field: { fieldName: string; fieldValue: string | number }) => ({
+        fieldName: field.fieldName,
+        value: field.fieldValue,
+      }),
+    );
+
+    return {
+      info: {
+        quoteTitle: quoteDetail?.quoteTitle || '',
+        referenceNumber: quoteDetail?.referenceNumber || '',
+      },
+      extraFields: currentExtraFields || [],
+      recipients: quoteDetail?.recipients || [],
+    };
+  }, [quoteDetail]);
+
   useScrollBar(false);
 
+  const { quotePurchasabilityPermission, quoteConvertToOrderPermission } =
+    quotePurchasabilityPermissionInfo;
+
   return (
-    <B3Spin isSpinning={isRequestLoading || quoteCheckoutLoadding}>
+    <B3Spin isSpinning={isRequestLoading || quoteCheckoutLoading}>
       <Box
         sx={{
           display: 'flex',
@@ -531,7 +654,6 @@ function QuoteDetail() {
           exportPdf={exportPdf}
           printQuote={printQuote}
           role={role}
-          quoteTitle={quoteDetail.quoteTitle}
           salesRepInfo={quoteDetail.salesRepInfo}
         />
 
@@ -541,6 +663,7 @@ function QuoteDetail() {
           }}
         >
           <QuoteInfo
+            quoteAndExtraFieldsInfo={quoteAndExtraFieldsInfo}
             contactInfo={quoteDetail.contactInfo}
             shippingAddress={quoteDetail.shippingAddress}
             billingAddress={quoteDetail.billingAddress}
@@ -556,7 +679,7 @@ function QuoteDetail() {
             flexWrap: isMobile ? 'wrap' : 'nowrap',
             paddingBottom: '20px',
             marginBottom: isMobile ? '6rem' : 0,
-            marginTop: !isMobile ? '1rem' : 0,
+            marginTop: isMobile ? 0 : '1rem',
             '@media print': {
               overflow: 'hidden',
             },
@@ -658,7 +781,7 @@ function QuoteDetail() {
               }}
             >
               <QuoteAttachment
-                allowUpload={+quoteDetail.status !== 4}
+                allowUpload={Number(quoteDetail.status) !== 4}
                 quoteId={quoteDetail.id}
                 status={quoteDetail.status}
                 defaultFileList={fileList}
@@ -679,7 +802,7 @@ function QuoteDetail() {
 
         {quoteConvertToOrderPermission &&
           quotePurchasabilityPermission &&
-          +quoteDetail.status !== 4 &&
+          Number(quoteDetail.status) !== 4 &&
           isShowFooter &&
           quoteDetail?.allowCheckout &&
           isAutoEnableQuoteCheckout &&

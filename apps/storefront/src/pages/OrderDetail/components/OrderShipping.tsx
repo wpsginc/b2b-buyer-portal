@@ -16,9 +16,13 @@ const ShipmentTitle = styled('span')(() => ({
   color: '#313440',
 }));
 
-export default function OrderShipping() {
+type OrderShippingProps = {
+  isCurrentCompany: boolean;
+};
+
+export default function OrderShipping({ isCurrentCompany }: OrderShippingProps) {
   const {
-    state: { shippings = [], addressLabelPermission, orderIsDigital, money },
+    state: { shippings = [], addressLabelPermission, money },
   } = useContext(OrderDetailsContext);
 
   const [isMobile] = useMobile();
@@ -78,7 +82,7 @@ export default function OrderShipping() {
     const {
       date_created: createdDate,
       shipping_method: shippingMethod,
-      shipping_provider: shippingProvider,
+      shipping_provider_display_name: shippingProvider,
     } = shipment;
 
     const time = format(new Date(createdDate), 'LLLL, d');
@@ -96,7 +100,11 @@ export default function OrderShipping() {
     return company.substring(index + 1, company.length);
   };
 
-  return orderIsDigital ? null : (
+  if (!shippingsDetail.length) {
+    return null;
+  }
+
+  return (
     <Stack spacing={2}>
       {shippingsDetail.map((shipping: OrderShippingsItem) => (
         <Card key={`shipping-${shipping.id}`}>
@@ -158,7 +166,7 @@ export default function OrderShipping() {
                     products={shipment.itemsInfo}
                     money={money}
                     totalText="Total"
-                    canToProduct
+                    canToProduct={isCurrentCompany}
                     textAlign="right"
                   />
                 </Fragment>
@@ -182,7 +190,7 @@ export default function OrderShipping() {
                   products={shipping.notShip.itemsInfo}
                   money={money}
                   totalText="Total"
-                  canToProduct
+                  canToProduct={isCurrentCompany}
                   textAlign={isMobile ? 'left' : 'right'}
                 />
               </Fragment>

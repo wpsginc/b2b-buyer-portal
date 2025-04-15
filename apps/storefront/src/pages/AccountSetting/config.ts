@@ -1,12 +1,5 @@
-import { LangFormatFunction } from '@b3/lang';
-
-interface ShippingListStatusProps {
-  label: string;
-  value: number;
-}
-
 export interface GetFilterMoreListProps {
-  options?: Array<ShippingListStatusProps>;
+  fieldId: string;
   rows?: string | number;
   name: string;
   label: string;
@@ -18,94 +11,67 @@ export interface GetFilterMoreListProps {
   size: string;
 }
 
-interface GetAccountSettingFilesReturnProps {
-  accountB2BFormFields: GetFilterMoreListProps[];
-  passwordModified: GetFilterMoreListProps[];
-}
-
-interface PasswordKeysProps {
-  name: string;
-  label: string;
-  idLang: string;
-}
-
-export const getPasswordKeys = (): PasswordKeysProps[] => [
-  {
-    name: 'currentPassword',
-    label: 'Current Password',
-    idLang: 'accountSettings.form.currentPassword',
-  },
-  {
-    name: 'password',
-    label: 'Password',
-    idLang: 'accountSettings.form.password',
-  },
-  {
-    name: 'confirmPassword',
-    label: 'Confirm Password',
-    idLang: 'accountSettings.form.confirmPassword',
-  },
-];
-
-export const getAccountSettingFiles = (
-  xs: number,
-  b3Lang: LangFormatFunction,
-): GetAccountSettingFilesReturnProps => {
-  const accountB2BFormFields = [
+export const getAccountSettingsFields = (): GetFilterMoreListProps[] => {
+  return [
     {
       name: 'company',
-      label: b3Lang('accountSettings.form.company'),
+      fieldId: 'field_company',
+      label: 'Company',
       required: false,
       default: '',
       fieldType: 'text',
-      xs,
+      xs: 12,
       variant: 'filled',
       size: 'small',
     },
     {
       name: 'role',
-      label: b3Lang('accountSettings.form.role'),
+      fieldId: 'field_role',
+      label: 'Role',
       required: false,
       default: '',
-      fieldType: 'dropdown',
-      options: [
-        {
-          label: b3Lang('accountSettings.form.admin'),
-          value: 0,
-        },
-        {
-          label: b3Lang('accountSettings.form.seniorBuyer'),
-          value: 1,
-        },
-        {
-          label: b3Lang('accountSettings.form.juniorBuyer'),
-          value: 2,
-        },
-        {
-          label: b3Lang('accountSettings.form.superAdmin'),
-          value: 3,
-        },
-      ],
-      xs,
+      fieldType: 'text',
+      xs: 12,
       variant: 'filled',
       size: 'small',
     },
   ];
+};
 
-  const passwordModified = getPasswordKeys().map((item: PasswordKeysProps) => ({
-    name: item.name,
-    label: item.label,
-    required: false,
-    default: '',
-    fieldType: 'password',
-    xs,
-    variant: 'filled',
-    size: 'small',
-    idLang: item.idLang,
-  }));
-
-  return {
-    accountB2BFormFields,
-    passwordModified,
-  };
+export const getPasswordModifiedFields = (): GetFilterMoreListProps[] => {
+  return [
+    {
+      name: 'currentPassword',
+      fieldId: 'field_current_password',
+      label: 'Current Password',
+      required: false,
+      default: '',
+      fieldType: 'password',
+      xs: 12,
+      variant: 'filled',
+      size: 'small',
+    },
+    {
+      name: 'password',
+      fieldId: 'field_password',
+      label: 'Password',
+      required: false,
+      default: '',
+      fieldType: 'password',
+      xs: 12,
+      variant: 'filled',
+      size: 'small',
+    },
+    {
+      name: 'confirmPassword',
+      fieldId: 'field_confirm_password',
+      label: 'Confirm Password',
+      required: false,
+      default: '',
+      fieldType: 'password',
+      xs: 12,
+      variant: 'filled',
+      size: 'small',
+    },
+  ];
 };

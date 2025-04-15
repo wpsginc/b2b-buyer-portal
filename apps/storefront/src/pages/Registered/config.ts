@@ -83,7 +83,11 @@ export interface RegisterFieldsItems {
   replaceOptions?: ReplaceOptionsProps;
 }
 
-export const steps = ['register.step.account', 'register.step.details', 'register.step.finish'];
+export const steps = [
+  'register.step.account',
+  'register.step.details',
+  'register.step.finish',
+] as const;
 
 const companyExtraFieldsType = ['text', 'multiline', 'number', 'dropdown'];
 
@@ -109,9 +113,9 @@ const classificationType = (item: CustomFieldItems) => {
   if (fieldsType.text.includes(item.fieldType)) {
     optionItems = {
       minlength: item.minlength || null,
-      maxLength: item.maxLength || +item.maximumLength || null,
+      maxLength: item.maxLength || Number(item.maximumLength) || null,
       min: item.min || null,
-      max: item.max || +item.maximumValue || null,
+      max: item.max || Number(item.maximumValue) || null,
       rows: item?.options?.rows || item.numberOfRows || null,
     };
     if (optionItems?.max) {

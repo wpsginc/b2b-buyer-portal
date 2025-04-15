@@ -1,17 +1,18 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { B2BEvent, useB2BCallback } from '@b3/hooks';
+import { dispatchEvent } from '@b3/hooks';
 import { useB3Lang } from '@b3/lang';
 import { ArrowBackIosNew } from '@mui/icons-material';
 import { Box, Checkbox, FormControlLabel, Stack, Typography } from '@mui/material';
-import cloneDeep from 'lodash-es/cloneDeep';
+import { cloneDeep, concat, uniq } from 'lodash-es';
 
 import CustomButton from '@/components/button/CustomButton';
 import { getContrastColor } from '@/components/outSideComponents/utils/b3CustomStyles';
 import B3Spin from '@/components/spin/B3Spin';
-import { useMobile, useSetCountry } from '@/hooks';
+import { permissionLevels } from '@/constants';
+import { useMobile, useSetCountry, useValidatePermissionWithComparisonType } from '@/hooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   createBCQuote,
   createQuote,
@@ -24,15 +25,25 @@ import {
   isB2BUserSelector,
   resetDraftQuoteInfo,
   resetDraftQuoteList,
-  rolePermissionSelector,
   setDraftQuoteInfo,
+  setDraftQuoteRecipients,
   setQuoteUserId,
   useAppDispatch,
   useAppSelector,
 } from '@/store';
 import { AddressItemType, BCAddressItemType } from '@/types/address';
-import { BillingAddress, ContactInfoKeys, ShippingAddress } from '@/types/quotes';
+import {
+  BillingAddress,
+  ContactInfoKeys,
+  QuoteExtraFields,
+  QuoteFormattedItemsProps,
+  QuoteInfo as QuoteInfoType,
+  ShippingAddress,
+} from '@/types/quotes';
 import { B3LStorage, channelId, snackbar, storeHash } from '@/utils';
+import { verifyCreatePermission } from '@/utils/b3CheckPermissions';
+import { b2bPermissionsMap } from '@/utils/b3CheckPermissions/config';
+import b2bLogger from '@/utils/b3Logger';
 import { addQuoteDraftProducts, getVariantInfoOOSAndPurchase } from '@/utils/b3Product/b3Product';
 import { deleteCartData } from '@/utils/cartUtils';
 import validateObject from '@/utils/quoteUtils';
@@ -52,6 +63,7 @@ import QuoteSummary from '../quote/components/QuoteSummary';
 import QuoteTable from '../quote/components/QuoteTable';
 import getAccountFormFields from '../quote/config';
 import Container from '../quote/style';
+import getB2BQuoteExtraFields from '../quote/utils/getQuoteExtraFields';
 
 type BCAddress = {
   node: BCAddressItemType;
@@ -109,7 +121,7 @@ const billingAddress = {
 function QuoteDraft({ setOpenPage }: PageProps) {
   const {
     state: { countriesList, openAPPParams },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
   const isB2BUser = useAppSelector(isB2BUserSelector);
   const companyB2BId = useAppSelector(({ company }) => company.companyInfo.id);
   const companyName = useAppSelector(({ company }) => company.companyInfo.companyName);
@@ -124,11 +136,13 @@ function QuoteDraft({ setOpenPage }: PageProps) {
   const salesRepCompanyName = useAppSelector(
     ({ b2bFeatures }) => b2bFeatures.masqueradeCompany.companyName,
   );
-  const quoteinfo = useAppSelector(({ quoteInfo }) => quoteInfo.draftQuoteInfo);
+  const quoteInfoOrigin = useAppSelector(({ quoteInfo }) => quoteInfo.draftQuoteInfo);
   const currency = useAppSelector(activeCurrencyInfoSelector);
-  const b2bPermissions = useAppSelector(rolePermissionSelector);
   const quoteSubmissionResponseInfo = useAppSelector(
     ({ global }) => global.quoteSubmissionResponse,
+  );
+  const { selectCompanyHierarchyId } = useAppSelector(
+    ({ company }) => company.companyHierarchyInfo,
   );
 
   const isEnableProduct = useAppSelector(
@@ -141,7 +155,16 @@ function QuoteDraft({ setOpenPage }: PageProps) {
     },
   } = useContext(CustomStyleContext);
 
-  const quotesActionsPermission = isB2BUser ? b2bPermissions.quotesActionsPermission : true;
+  const quotesActionsPermission = useMemo(() => {
+    if (isB2BUser) {
+      return verifyCreatePermission(
+        b2bPermissionsMap.quotesCreateActionsPermission,
+        Number(selectCompanyHierarchyId),
+      );
+    }
+
+    return true;
+  }, [isB2BUser, selectCompanyHierarchyId]);
 
   const navigate = useNavigate();
 
@@ -160,8 +183,15 @@ function QuoteDraft({ setOpenPage }: PageProps) {
   const [quoteSubmissionResponseOpen, setQuoteSubmissionResponseOpen] = useState<boolean>(false);
   const [quoteId, setQuoteId] = useState<string | number>('');
   const [currentCreatedAt, setCurrentCreatedAt] = useState<string | number>('');
+  const [extraFields, setExtraFields] = useState<QuoteFormattedItemsProps[]>([]);
 
   const quoteSummaryRef = useRef<QuoteSummaryRef | null>(null);
+
+  const [isAddressCompanyHierarchy] = useValidatePermissionWithComparisonType({
+    level: permissionLevels.COMPANY_SUBSIDIARIES,
+    code: b2bPermissionsMap.getAddressesPermission,
+    containOrEqual: 'equal',
+  });
 
   useSetCountry();
 
@@ -185,57 +215,72 @@ function QuoteDraft({ setOpenPage }: PageProps) {
         dispatch(setDraftQuoteInfo(newInfo));
       };
 
-      try {
-        const quoteInfo = cloneDeep(quoteinfo);
+      const quoteInfo = cloneDeep(quoteInfoOrigin);
 
+      try {
         if (isB2BUser) {
           const companyId = companyB2BId || salesRepCompanyId;
-          const {
-            addresses: { edges: addressB2BList = [] },
-          } = await getB2BCustomerAddresses(+companyId);
 
-          const shippingDefautAddress = addressB2BList.find(
+          let addressB2BList = [];
+          const fetchAddresses = async (id: number) => {
+            const {
+              addresses: { edges },
+            } = await getB2BCustomerAddresses(id);
+            return edges;
+          };
+
+          if (!selectCompanyHierarchyId) {
+            addressB2BList = await fetchAddresses(Number(companyId));
+          } else if (selectCompanyHierarchyId && isAddressCompanyHierarchy) {
+            addressB2BList = await fetchAddresses(Number(selectCompanyHierarchyId));
+          }
+
+          const shippingDefaultAddress = addressB2BList.find(
             (item: B2BAddress) => item?.node?.isDefaultShipping === 1,
           );
-          const billingDefautAddress = addressB2BList.find(
+          const billingDefaultAddress = addressB2BList.find(
             (item: B2BAddress) => item?.node?.isDefaultBilling === 1,
           );
 
-          if (shippingDefautAddress && validateObject(quoteInfo, 'shippingAddress')) {
+          if (shippingDefaultAddress && validateObject(quoteInfo, 'shippingAddress')) {
             const addressItem = {
-              label: shippingDefautAddress?.node?.label || '',
-              firstName: shippingDefautAddress?.node?.firstName || '',
-              lastName: shippingDefautAddress?.node?.lastName || '',
-              companyName: shippingDefautAddress?.node?.company || '',
-              country: shippingDefautAddress?.node?.countryCode || '',
-              address: shippingDefautAddress?.node?.addressLine1 || '',
-              apartment: shippingDefautAddress?.node?.addressLine2 || '',
-              city: shippingDefautAddress?.node?.city || '',
-              state: shippingDefautAddress?.node?.state || '',
-              zipCode: shippingDefautAddress?.node?.zipCode || '',
-              phoneNumber: shippingDefautAddress?.node?.phoneNumber || '',
-              addressId: shippingDefautAddress?.node?.id ? +shippingDefautAddress.node.id : 0,
+              label: shippingDefaultAddress?.node?.label || '',
+              firstName: shippingDefaultAddress?.node?.firstName || '',
+              lastName: shippingDefaultAddress?.node?.lastName || '',
+              companyName: shippingDefaultAddress?.node?.company || '',
+              country: shippingDefaultAddress?.node?.countryCode || '',
+              address: shippingDefaultAddress?.node?.addressLine1 || '',
+              apartment: shippingDefaultAddress?.node?.addressLine2 || '',
+              city: shippingDefaultAddress?.node?.city || '',
+              state: shippingDefaultAddress?.node?.state || '',
+              zipCode: shippingDefaultAddress?.node?.zipCode || '',
+              phoneNumber: shippingDefaultAddress?.node?.phoneNumber || '',
+              addressId: shippingDefaultAddress?.node?.id
+                ? Number(shippingDefaultAddress.node.id)
+                : 0,
             };
 
             quoteInfo.shippingAddress = addressItem as ShippingAddress;
           }
           if (
-            billingDefautAddress &&
+            billingDefaultAddress &&
             (!quoteInfo?.billingAddress || validateObject(quoteInfo, 'billingAddress'))
           ) {
             const addressItem = {
-              label: billingDefautAddress?.node?.label || '',
-              firstName: billingDefautAddress?.node?.firstName || '',
-              lastName: billingDefautAddress?.node?.lastName || '',
-              companyName: billingDefautAddress?.node?.company || '',
-              country: billingDefautAddress?.node?.countryCode || '',
-              address: billingDefautAddress?.node?.addressLine1 || '',
-              apartment: billingDefautAddress?.node?.addressLine2 || '',
-              city: billingDefautAddress?.node?.city || '',
-              state: billingDefautAddress?.node?.state || '',
-              zipCode: billingDefautAddress?.node?.zipCode || '',
-              phoneNumber: billingDefautAddress?.node?.phoneNumber || '',
-              addressId: billingDefautAddress?.node?.id ? +billingDefautAddress.node.id : 0,
+              label: billingDefaultAddress?.node?.label || '',
+              firstName: billingDefaultAddress?.node?.firstName || '',
+              lastName: billingDefaultAddress?.node?.lastName || '',
+              companyName: billingDefaultAddress?.node?.company || '',
+              country: billingDefaultAddress?.node?.countryCode || '',
+              address: billingDefaultAddress?.node?.addressLine1 || '',
+              apartment: billingDefaultAddress?.node?.addressLine2 || '',
+              city: billingDefaultAddress?.node?.city || '',
+              state: billingDefaultAddress?.node?.state || '',
+              zipCode: billingDefaultAddress?.node?.zipCode || '',
+              phoneNumber: billingDefaultAddress?.node?.phoneNumber || '',
+              addressId: billingDefaultAddress?.node?.id
+                ? Number(billingDefaultAddress.node.id)
+                : 0,
             };
 
             quoteInfo.billingAddress = addressItem as BillingAddress;
@@ -252,10 +297,29 @@ function QuoteDraft({ setOpenPage }: PageProps) {
           }));
           setAddressList(list);
         }
+
+        const extraFieldsInfo = await getB2BQuoteExtraFields();
+        if (extraFieldsInfo.length) {
+          setExtraFields(extraFieldsInfo);
+          const preExtraFields = quoteInfo.extraFields;
+          const defaultValues = extraFieldsInfo?.map((field) => {
+            const defaultValue =
+              preExtraFields?.find((item: QuoteExtraFields) => item.fieldName === field.name)
+                ?.value || field?.default;
+
+            return {
+              id: Number(field.id),
+              fieldName: field.name,
+              value: defaultValue || '',
+            };
+          });
+          quoteInfo.extraFields = defaultValues;
+        }
+
         if (
           quoteInfo &&
           (!quoteInfo?.contactInfo || validateObject(quoteInfo, 'contactInfo')) &&
-          +role !== 100
+          Number(role) !== 100
         ) {
           setCustomInfo(quoteInfo);
         } else if (quoteInfo) {
@@ -263,7 +327,7 @@ function QuoteDraft({ setOpenPage }: PageProps) {
         }
       } finally {
         const quoteUserId = customer.b2bId || customer.id || 0;
-        dispatch(setQuoteUserId(+quoteUserId));
+        dispatch(setQuoteUserId(Number(quoteUserId)));
 
         setLoading(false);
       }
@@ -272,30 +336,77 @@ function QuoteDraft({ setOpenPage }: PageProps) {
     init();
     // disabling as we only need to run this once and values at starting render are good enough
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectCompanyHierarchyId, isAddressCompanyHierarchy]);
+
+  const quoteAndExtraFieldsInfo = useMemo(() => {
+    const contactInfo: CustomFieldItems = quoteInfoOrigin.contactInfo || {};
+
+    return {
+      info: {
+        quoteTitle: contactInfo?.quoteTitle || '',
+        referenceNumber: quoteInfoOrigin?.referenceNumber || '',
+      },
+      extraFields: quoteInfoOrigin.extraFields || [],
+      recipients: quoteInfoOrigin.recipients || [],
+    };
+  }, [quoteInfoOrigin]);
 
   const getAddress = () => {
-    const addresssaveInfo = {
+    const addressSaveInfo = {
       shippingAddress,
       billingAddress,
     };
 
     if (billingRef?.current) {
-      addresssaveInfo.billingAddress = billingRef.current.getContactInfoValue();
+      addressSaveInfo.billingAddress = billingRef.current.getContactInfoValue();
     }
     if (shippingRef?.current) {
-      addresssaveInfo.shippingAddress = shippingRef.current.getContactInfoValue();
+      addressSaveInfo.shippingAddress = shippingRef.current.getContactInfoValue();
     }
 
-    return addresssaveInfo;
+    return addressSaveInfo;
+  };
+
+  const handleSaveCCEmail = async (ccEmail: string[]) => {
+    dispatch(setDraftQuoteRecipients(ccEmail));
+  };
+
+  const handleCollectingData = async (saveInfo: QuoteInfoType) => {
+    if (contactInfoRef?.current) {
+      const contactInfo = await contactInfoRef.current.getContactInfoValue();
+      if (!contactInfo) return false;
+
+      const currentRecipients = saveInfo?.recipients || [];
+      if (contactInfo.ccEmail.trim().length) {
+        saveInfo.recipients = uniq(concat(currentRecipients, [contactInfo.ccEmail]));
+      }
+
+      saveInfo.contactInfo = {
+        name: contactInfo?.name,
+        email: contactInfo?.email,
+        companyName: contactInfo?.companyName || '',
+        phoneNumber: contactInfo?.phoneNumber,
+        quoteTitle: contactInfo?.quoteTitle,
+      };
+      saveInfo.referenceNumber = contactInfo?.referenceNumber || '';
+
+      const extraFieldsInfo = extraFields.map((field) => ({
+        id: Number(field.id),
+        fieldName: field.name,
+        value: field.name ? contactInfo[field.name] : '',
+      }));
+      saveInfo.extraFields = extraFieldsInfo;
+
+      return true;
+    }
+    return false;
   };
 
   const handleSaveInfoClick = async () => {
-    const saveInfo = cloneDeep(quoteinfo);
+    const saveInfo = cloneDeep(quoteInfoOrigin);
     if (contactInfoRef?.current) {
-      const contactInfo = await contactInfoRef.current.getContactInfoValue();
-      if (!contactInfo) return;
-      saveInfo.contactInfo = contactInfo;
+      const data = await handleCollectingData(saveInfo);
+      if (!data) return;
     }
 
     const { shippingAddress, billingAddress } = getAddress();
@@ -366,201 +477,202 @@ function QuoteDraft({ setOpenPage }: PageProps) {
     }
   };
 
-  const handleSubmit = useB2BCallback(
-    B2BEvent.OnQuoteCreate,
-    async (dispatchOnQuoteCreateEvent) => {
-      setLoading(true);
-      try {
-        const info = cloneDeep(quoteinfo);
-        const contactInfo = info?.contactInfo || {};
-
-        const quoteTitle = contactInfo?.quoteTitle || '';
-
-        if ('quoteTitle' in contactInfo) delete contactInfo.quoteTitle;
-
-        const isComplete = Object.keys(contactInfo).every((key: string) => {
-          if (key === 'phoneNumber' || key === 'companyName') {
-            return true;
-          }
-
-          return contactInfo && !!contactInfo[key as ContactInfoKeys];
-        });
-
-        if (validateObject(quoteinfo, 'contactInfo') || !isComplete) {
-          snackbar.error(b3Lang('quoteDraft.addQuoteInfo'));
-          return;
-        }
-
-        if (!draftQuoteList || draftQuoteList.length === 0) {
-          snackbar.error(b3Lang('quoteDraft.submit'));
-          return;
-        }
-
-        if (!isEnableProduct) {
-          const itHasInvalidProduct = draftQuoteList.some((item) => {
-            return getVariantInfoOOSAndPurchase(item)?.name;
-          });
-
-          if (itHasInvalidProduct) {
-            snackbar.error(b3Lang('quoteDraft.submit.errorTip'));
-            return;
-          }
-        }
-
-        const note = info?.note || '';
-        const newNote = note.trim().replace(/[\r\n]/g, '\\n');
-
-        const perfectAddress = (address: ShippingAddress | BillingAddress) => {
-          const newAddress = cloneDeep(address);
-
-          const countryItem = countriesList?.find(
-            (item: Country) => item.countryCode === newAddress.country,
-          );
-
-          if (countryItem) {
-            newAddress.country = countryItem.countryName;
-          }
-
-          newAddress.address = address?.address || '';
-          newAddress.apartment = address?.apartment || '';
-
-          return newAddress;
-        };
-
-        const { shippingAddress: editShippingAddress, billingAddress: editBillingAddress } =
-          billingRef?.current ? getAddress() : info;
-
-        const shippingAddress = editShippingAddress ? perfectAddress(editShippingAddress) : {};
-
-        const billingAddress = editBillingAddress ? perfectAddress(editBillingAddress) : {};
-
-        let allPrice = 0;
-        let allTaxPrice = 0;
-
-        const calculationTime = (value: string | number) => {
-          if (typeof value === 'string' && value.includes('-')) {
-            return `${new Date(value).getTime() / 1000}`;
-          }
-          return value;
-        };
-
-        const productList = draftQuoteList.map((item) => {
-          const { node } = item;
-          const product = {
-            ...node.productsSearch,
-            selectOptions: node?.optionList || '',
-          };
-
-          const productFields = getProductOptionsFields(product, {});
-          const optionsList =
-            productFields
-              .map((item) => ({
-                optionId: item.optionId,
-                optionValue:
-                  item.fieldType === 'date' ? calculationTime(item.optionValue) : item.optionValue,
-                optionLabel: `${item.valueText}`,
-                optionName: item.valueLabel,
-                type: item?.fieldOriginType || item.fieldType,
-              }))
-              .filter((list: CustomFieldItems) => !!list.optionName) || [];
-
-          const variants = node?.productsSearch?.variants;
-          let varantsItem;
-          if (Array.isArray(variants)) {
-            varantsItem = variants.find((item) => item.sku === node.variantSku);
-          }
-
-          allPrice += +(node?.basePrice || 0) * +(node?.quantity || 0);
-
-          allTaxPrice += +(node?.taxPrice || 0) * +(node?.quantity || 0);
-
-          const items = {
-            productId: node?.productsSearch?.id,
-            sku: node.variantSku,
-            basePrice: (+(node?.basePrice || 0)).toFixed(currency.decimal_places),
-            discount: '0.00',
-            offeredPrice: (+(node?.basePrice || 0)).toFixed(currency.decimal_places),
-            quantity: node.quantity,
-            variantId: varantsItem?.variant_id,
-            imageUrl: node.primaryImage,
-            productName: node.productName,
-            options: optionsList,
-          };
-
-          return items;
-        });
-
-        const fileList = getFileList(quoteinfo?.fileInfo || []);
-
-        const data = {
-          message: newNote,
-          legalTerms: '',
-          totalAmount: enteredInclusiveTax
-            ? allPrice.toFixed(currency.decimal_places)
-            : (allPrice + allTaxPrice).toFixed(currency.decimal_places),
-          grandTotal: allPrice.toFixed(currency.decimal_places),
-          subtotal: allPrice.toFixed(currency.decimal_places),
-          companyId: isB2BUser ? companyB2BId || salesRepCompanyId : '',
-          storeHash,
-          quoteTitle,
-          discount: '0.00',
-          channelId,
-          userEmail: customer.emailAddress,
-          shippingAddress,
-          billingAddress,
-          contactInfo,
-          productList,
-          fileList,
-          taxTotal: allTaxPrice.toFixed(currency.decimal_places),
-          currency: {
-            currencyExchangeRate: currency.currency_exchange_rate,
-            token: currency.token,
-            location: currency.token_location,
-            decimalToken: currency.decimal_token,
-            decimalPlaces: currency.decimal_places,
-            thousandsToken: currency.thousands_token,
-            currencyCode: currency.currency_code,
-          },
-        };
-
-        const fn = +role === 99 ? createBCQuote : createQuote;
-
-        if (!dispatchOnQuoteCreateEvent(data)) {
-          throw new Error();
-        }
-
-        const {
-          quoteCreate: {
-            quote: { id, createdAt },
-          },
-        } = await fn(data);
-
-        setQuoteId(id);
-        setCurrentCreatedAt(createdAt);
-
-        if (id) {
-          const cartId = B3LStorage.get('cartToQuoteId');
-          const deleteCartObject = deleteCartData(cartId);
-
-          await deleteCart(deleteCartObject);
-        }
-
-        if (quoteSubmissionResponseInfo.value === '0') {
-          handleAfterSubmit(id, createdAt);
-        } else {
-          setQuoteSubmissionResponseOpen(true);
-        }
-      } catch (error: any) {
-        if (error.message && error.message.length > 0) {
-          snackbar.error(error.message, {
-            isClose: true,
-          });
-        }
-      } finally {
-        setLoading(false);
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const info = cloneDeep(quoteInfoOrigin);
+      if (isEdit && contactInfoRef?.current) {
+        const data = await handleCollectingData(info);
+        if (!data) return;
       }
-    },
-  );
+
+      const contactInfo = info?.contactInfo || {};
+
+      const quoteTitle = contactInfo?.quoteTitle || '';
+
+      if ('quoteTitle' in contactInfo) delete contactInfo.quoteTitle;
+
+      const isComplete = Object.keys(contactInfo).every((key: string) => {
+        if (key === 'phoneNumber' || key === 'companyName') {
+          return true;
+        }
+
+        return contactInfo && !!contactInfo[key as ContactInfoKeys];
+      });
+
+      if (validateObject(quoteInfoOrigin, 'contactInfo') || !isComplete) {
+        snackbar.error(b3Lang('quoteDraft.addQuoteInfo'));
+        return;
+      }
+
+      if (!draftQuoteList || draftQuoteList.length === 0) {
+        snackbar.error(b3Lang('quoteDraft.submit'));
+        return;
+      }
+
+      if (!isEnableProduct) {
+        const itHasInvalidProduct = draftQuoteList.some((item) => {
+          return getVariantInfoOOSAndPurchase(item)?.name;
+        });
+
+        if (itHasInvalidProduct) {
+          snackbar.error(b3Lang('quoteDraft.submit.errorTip'));
+          return;
+        }
+      }
+
+      const note = info?.note || '';
+      const newNote = note.trim().replace(/[\r\n]/g, '\\n');
+
+      const perfectAddress = (address: ShippingAddress | BillingAddress) => {
+        const newAddress = cloneDeep(address);
+
+        const countryItem = countriesList?.find(
+          (item: Country) => item.countryCode === newAddress.country,
+        );
+
+        if (countryItem) {
+          newAddress.country = countryItem.countryName;
+        }
+
+        newAddress.address = address?.address || '';
+        newAddress.apartment = address?.apartment || '';
+
+        return newAddress;
+      };
+
+      const { shippingAddress: editShippingAddress, billingAddress: editBillingAddress } =
+        billingRef?.current ? getAddress() : info;
+
+      const shippingAddress = editShippingAddress ? perfectAddress(editShippingAddress) : {};
+
+      const billingAddress = editBillingAddress ? perfectAddress(editBillingAddress) : {};
+
+      let allPrice = 0;
+      let allTaxPrice = 0;
+
+      const calculationTime = (value: string | number) => {
+        if (typeof value === 'string' && value.includes('-')) {
+          return `${new Date(value).getTime() / 1000}`;
+        }
+        return value;
+      };
+
+      const productList = draftQuoteList.map((item) => {
+        const { node } = item;
+        const product = {
+          ...node.productsSearch,
+          selectOptions: node?.optionList || '',
+        };
+
+        const productFields = getProductOptionsFields(product, {});
+        const optionsList =
+          productFields
+            .map((item) => ({
+              optionId: item.optionId,
+              optionValue:
+                item.fieldType === 'date' ? calculationTime(item.optionValue) : item.optionValue,
+              optionLabel: `${item.valueText}`,
+              optionName: item.valueLabel,
+              type: item?.fieldOriginType || item.fieldType,
+            }))
+            .filter((list: CustomFieldItems) => !!list.optionName) || [];
+
+        const variants = node?.productsSearch?.variants;
+        let variantsItem;
+        if (Array.isArray(variants)) {
+          variantsItem = variants.find((item) => item.sku === node.variantSku);
+        }
+
+        allPrice += Number(node?.basePrice || 0) * Number(node?.quantity || 0);
+
+        allTaxPrice += Number(node?.taxPrice || 0) * Number(node?.quantity || 0);
+
+        const items = {
+          productId: node?.productsSearch?.id,
+          sku: node.variantSku,
+          basePrice: Number(node?.basePrice || 0).toFixed(currency.decimal_places),
+          discount: '0.00',
+          offeredPrice: Number(node?.basePrice || 0).toFixed(currency.decimal_places),
+          quantity: node.quantity,
+          variantId: variantsItem?.variant_id,
+          imageUrl: node.primaryImage,
+          productName: node.productName,
+          options: optionsList,
+        };
+
+        return items;
+      });
+
+      const fileList = getFileList(quoteInfoOrigin?.fileInfo || []);
+
+      const data = {
+        message: newNote,
+        legalTerms: '',
+        totalAmount: enteredInclusiveTax
+          ? allPrice.toFixed(currency.decimal_places)
+          : (allPrice + allTaxPrice).toFixed(currency.decimal_places),
+        grandTotal: allPrice.toFixed(currency.decimal_places),
+        subtotal: allPrice.toFixed(currency.decimal_places),
+        companyId: isB2BUser ? selectCompanyHierarchyId || companyB2BId || salesRepCompanyId : '',
+        storeHash,
+        quoteTitle,
+        discount: '0.00',
+        channelId,
+        userEmail: customer.emailAddress,
+        shippingAddress,
+        billingAddress,
+        contactInfo,
+        productList,
+        fileList,
+        taxTotal: allTaxPrice.toFixed(currency.decimal_places),
+        currency: {
+          currencyExchangeRate: currency.currency_exchange_rate,
+          token: currency.token,
+          location: currency.token_location,
+          decimalToken: currency.decimal_token,
+          decimalPlaces: currency.decimal_places,
+          thousandsToken: currency.thousands_token,
+          currencyCode: currency.currency_code,
+        },
+        referenceNumber: `${info.referenceNumber}` || '',
+        extraFields: info.extraFields || [],
+        recipients: info.recipients || [],
+      };
+
+      const fn = Number(role) === 99 ? createBCQuote : createQuote;
+
+      if (!dispatchEvent('on-quote-create', data)) {
+        throw new Error();
+      }
+
+      const {
+        quoteCreate: {
+          quote: { id, createdAt },
+        },
+      } = await fn(data);
+
+      setQuoteId(id);
+      setCurrentCreatedAt(createdAt);
+
+      if (id) {
+        const cartId = B3LStorage.get('cartToQuoteId');
+        const deleteCartObject = deleteCartData(cartId);
+
+        await deleteCart(deleteCartObject);
+      }
+
+      if (quoteSubmissionResponseInfo.value === '0') {
+        handleAfterSubmit(id, createdAt);
+      } else {
+        setQuoteSubmissionResponseOpen(true);
+      }
+    } catch (error: any) {
+      b2bLogger.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCloseQuoteSubmissionResponse = () => {
     setQuoteSubmissionResponseOpen(false);
@@ -570,7 +682,7 @@ function QuoteDraft({ setOpenPage }: PageProps) {
 
   const backText = () => {
     let text =
-      +role === 100
+      Number(role) === 100
         ? b3Lang('quoteDraft.button.back')
         : b3Lang('quoteDraft.button.backToQuoteLists');
     if (openAPPParams?.quoteBtn === 'open') {
@@ -617,7 +729,7 @@ function QuoteDraft({ setOpenPage }: PageProps) {
               alignItems: 'center',
             }}
             onClick={() => {
-              if (openAPPParams?.quoteBtn || +role === 100) {
+              if (openAPPParams?.quoteBtn || Number(role) === 100) {
                 navigate('/');
                 setOpenPage({
                   isOpen: false,
@@ -654,8 +766,8 @@ function QuoteDraft({ setOpenPage }: PageProps) {
             sx={{
               display: 'flex',
               mb: '24px',
-              flexDirection: `${isMobile ? 'column' : 'row'}`,
-              alignItems: `${isMobile ? 'flex-start' : 'center'}`,
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'flex-start' : 'center',
             }}
           >
             <Typography
@@ -663,7 +775,7 @@ function QuoteDraft({ setOpenPage }: PageProps) {
               sx={{
                 fontSize: '34px',
                 mr: '1rem',
-                mb: `${isMobile ? '1rem' : '0'}`,
+                mb: isMobile ? '1rem' : '0',
                 color: getContrastColor(backgroundColor),
               }}
             >
@@ -673,20 +785,7 @@ function QuoteDraft({ setOpenPage }: PageProps) {
           </Box>
           {quotesActionsPermission && (
             <Box>
-              {!isMobile ? (
-                <CustomButton
-                  variant="contained"
-                  size="small"
-                  sx={{
-                    padding: '8px 22px',
-                    alignSelf: 'center',
-                    marginBottom: '24px',
-                  }}
-                  onClick={handleSubmit}
-                >
-                  {b3Lang('quoteDraft.button.submit')}
-                </CustomButton>
-              ) : (
+              {isMobile ? (
                 <Box
                   sx={{
                     position: 'fixed',
@@ -712,6 +811,19 @@ function QuoteDraft({ setOpenPage }: PageProps) {
                     {b3Lang('quoteDraft.button.submit')}
                   </CustomButton>
                 </Box>
+              ) : (
+                <CustomButton
+                  variant="contained"
+                  size="small"
+                  sx={{
+                    padding: '8px 22px',
+                    alignSelf: 'center',
+                    marginBottom: '24px',
+                  }}
+                  onClick={handleSubmit}
+                >
+                  {b3Lang('quoteDraft.button.submit')}
+                </CustomButton>
               )}
             </Box>
           )}
@@ -720,10 +832,11 @@ function QuoteDraft({ setOpenPage }: PageProps) {
         <Box>
           {!isEdit && (
             <QuoteInfo
+              quoteAndExtraFieldsInfo={quoteAndExtraFieldsInfo}
               status="Draft"
-              contactInfo={quoteinfo?.contactInfo}
-              shippingAddress={quoteinfo?.shippingAddress}
-              billingAddress={quoteinfo?.billingAddress || {}}
+              contactInfo={quoteInfoOrigin?.contactInfo}
+              shippingAddress={quoteInfoOrigin?.shippingAddress}
+              billingAddress={quoteInfoOrigin?.billingAddress || {}}
               handleEditInfoClick={handleEditInfoClick}
             />
           )}
@@ -731,7 +844,12 @@ function QuoteDraft({ setOpenPage }: PageProps) {
             <Container flexDirection="column">
               <ContactInfo
                 emailAddress={customer.emailAddress}
-                info={quoteinfo?.contactInfo}
+                info={quoteInfoOrigin?.contactInfo}
+                referenceNumber={quoteInfoOrigin?.referenceNumber || ''}
+                quoteExtraFields={extraFields}
+                extraFieldsDefault={quoteInfoOrigin.extraFields || []}
+                recipients={quoteInfoOrigin?.recipients || []}
+                handleSaveCCEmail={handleSaveCCEmail}
                 ref={contactInfoRef}
               />
               <Box
@@ -743,7 +861,7 @@ function QuoteDraft({ setOpenPage }: PageProps) {
               >
                 <QuoteAddress
                   title={b3Lang('quoteDraft.section.billing')}
-                  info={quoteinfo?.billingAddress}
+                  info={quoteInfoOrigin?.billingAddress}
                   addressList={addressList}
                   pr={isMobile ? 0 : '8px'}
                   ref={billingRef}
@@ -755,7 +873,7 @@ function QuoteDraft({ setOpenPage }: PageProps) {
                 />
                 <QuoteAddress
                   title={b3Lang('quoteDraft.section.shipping')}
-                  info={quoteinfo?.shippingAddress}
+                  info={quoteInfoOrigin?.shippingAddress}
                   addressList={addressList}
                   pl={isMobile ? 0 : '8px'}
                   ref={shippingRef}
@@ -858,7 +976,6 @@ function QuoteDraft({ setOpenPage }: PageProps) {
           </Container>
         </Box>
       </Box>
-
       <QuoteSubmissionResponse
         isOpen={quoteSubmissionResponseOpen}
         onClose={handleCloseQuoteSubmissionResponse}

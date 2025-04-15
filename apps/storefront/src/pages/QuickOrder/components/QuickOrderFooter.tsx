@@ -18,7 +18,7 @@ import { successTip } from '@/components';
 import CustomButton from '@/components/button/CustomButton';
 import { CART_URL, PRODUCT_DEFAULT_IMAGE } from '@/constants';
 import { useMobile } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   addProductToBcShoppingList,
   addProductToShoppingList,
@@ -26,7 +26,7 @@ import {
   searchBcProducts,
 } from '@/shared/service/b2b';
 import { activeCurrencyInfoSelector, rolePermissionSelector, useAppSelector } from '@/store';
-import { currencyFormat, getProductPriceIncTax, snackbar } from '@/utils';
+import { currencyFormat, getProductPriceIncTaxOrExTaxBySetting, snackbar } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 import {
   addQuoteDraftProducts,
@@ -109,7 +109,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
   const { checkedArr, isAgenting, setIsRequestLoading, isB2BUser } = props;
   const {
     state: { productQuoteEnabled = false, shoppingListEnabled = false },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
   const b3Lang = useB3Lang();
   const companyInfoId = useAppSelector((state) => state.company.companyInfo.id);
   const { currency_code: currencyCode } = useAppSelector(activeCurrencyInfoSelector);
@@ -159,7 +159,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
       const { node } = item;
 
       const currentProduct: CustomFieldItems | undefined = inventoryInfos.find(
-        (inventory: CustomFieldItems) => +node.productId === inventory.id,
+        (inventory: CustomFieldItems) => Number(node.productId) === inventory.id,
       );
       if (currentProduct) {
         const { variants }: CustomFieldItems = currentProduct;
@@ -167,7 +167,8 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
         if (variants.length > 0) {
           const currentInventoryInfo: CustomFieldItems | undefined = variants.find(
             (variant: CustomFieldItems) =>
-              node.variantSku === variant.sku && +node.variantId === +variant.variant_id,
+              node.variantSku === variant.sku &&
+              Number(node.variantId) === Number(variant.variant_id),
           );
 
           if (currentInventoryInfo) {
@@ -202,8 +203,8 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
       checkedArr.forEach((item: CheckedProduct) => {
         const { node } = item;
 
-        if (!productIds.includes(+node.productId)) {
-          productIds.push(+node.productId);
+        if (!productIds.includes(Number(node.productId))) {
+          productIds.push(Number(node.productId));
         }
       });
 
@@ -305,8 +306,8 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
       productsWithSku.forEach((product: CheckedProduct) => {
         const { node } = product;
 
-        if (!productIds.includes(+node.productId)) {
-          productIds.push(+node.productId);
+        if (!productIds.includes(Number(node.productId))) {
+          productIds.push(Number(node.productId));
         }
       });
 
@@ -341,7 +342,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
         const optionsList = getOptionsList(optionList);
 
         const currentProductSearch = newProductInfo.find(
-          (product: CustomFieldItems) => +product.id === +productId,
+          (product: CustomFieldItems) => Number(product.id) === Number(productId),
         );
 
         const variantItem = currentProductSearch?.variants.find(
@@ -363,7 +364,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
             productsSearch: currentProductSearch,
             primaryImage: variantItem?.image_url || PRODUCT_DEFAULT_IMAGE,
             productName,
-            quantity: +quantity || 1,
+            quantity: Number(quantity) || 1,
             optionList: JSON.stringify(optionsList),
             productId,
             basePrice,
@@ -487,8 +488,8 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
       checkedArr.forEach((product: CheckedProduct) => {
         const { node } = product;
 
-        if (!productIds.includes(+node.productId)) {
-          productIds.push(+node.productId);
+        if (!productIds.includes(Number(node.productId))) {
+          productIds.push(Number(node.productId));
         }
       });
 
@@ -503,16 +504,16 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
 
         const newOptionLists = getValidOptionsList(optionsList, productsSearch);
         items.push({
-          productId: +productId,
-          variantId: +variantId,
-          quantity: +quantity,
+          productId: Number(productId),
+          variantId: Number(variantId),
+          quantity: Number(quantity),
           optionList: newOptionLists,
         });
       });
 
       const addToShoppingList = isB2BUser ? addProductToShoppingList : addProductToBcShoppingList;
       await addToShoppingList({
-        shoppingListId: +shoppingListId,
+        shoppingListId: Number(shoppingListId),
         items,
       });
 
@@ -564,10 +565,12 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
         } = item;
 
         if (variants?.length) {
-          const priceIncTax = getProductPriceIncTax(variants, +variantId) || +(basePrice || 0);
-          total += priceIncTax * +quantity;
+          const priceIncTax =
+            getProductPriceIncTaxOrExTaxBySetting(variants, Number(variantId)) ||
+            Number(basePrice || 0);
+          total += priceIncTax * Number(quantity);
         } else {
-          total += +(basePrice || 0) * +quantity;
+          total += Number(basePrice || 0) * Number(quantity);
         }
       });
 
@@ -720,7 +723,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
               <Box
                 sx={{
                   width: '33.3333%',
-                  display: !isMobile ? 'block' : 'none',
+                  display: isMobile ? 'none' : 'block',
                 }}
               />
             </Box>

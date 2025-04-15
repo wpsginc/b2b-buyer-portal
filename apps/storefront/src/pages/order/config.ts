@@ -2,7 +2,7 @@ import { CustomerRole } from '@/types';
 import { OrderStatusType } from '@/types/gql/graphql';
 
 export interface FilterSearchProps {
-  [key: string]: string | number | null;
+  [key: string]: string | number | number[] | null;
   beginDateAt: string | null;
   endDateAt: string | null;
   orderBy: string;
@@ -11,6 +11,7 @@ export interface FilterSearchProps {
   companyName: string;
   isShowMy: number;
   companyId: string;
+  companyIds: number[];
 }
 
 export interface FilterMoreProps {
@@ -28,7 +29,7 @@ export const sortKeys = {
   poNumber: 'poNumber',
   totalIncTax: 'totalIncTax',
   status: 'status',
-  placedby: 'placedBy',
+  placedBy: 'placedBy',
   createdAt: 'createdAt',
 };
 
@@ -43,6 +44,7 @@ const b2bFilterSearch: FilterSearchProps = {
   orderNumber: '',
   poNumber: '',
   isShowMy: 0,
+  companyIds: [],
 };
 
 const bcFilterSearch = {
@@ -114,7 +116,7 @@ export const getFilterMoreData = (
     },
   ];
 
-  const filterCondition = isB2BUser && !(+role === 3 && !isAgenting);
+  const filterCondition = isB2BUser && !(Number(role) === 3 && !isAgenting);
   const filterCurrentMoreList = filterMoreList.filter((item) => {
     if (
       (!isB2BUser || filterCondition) &&
@@ -122,9 +124,9 @@ export const getFilterMoreData = (
       (item.name === 'company' || item.name === 'PlacedBy')
     )
       return false;
-    if (+role === 3 && !isAgenting && item.name === 'PlacedBy') return false;
+    if (Number(role) === 3 && !isAgenting && item.name === 'PlacedBy') return false;
     if (
-      (isB2BUser || (+role === CustomerRole.SUPER_ADMIN && isAgenting)) &&
+      (isB2BUser || (Number(role) === CustomerRole.SUPER_ADMIN && isAgenting)) &&
       isCompanyOrder &&
       item.name === 'company'
     )

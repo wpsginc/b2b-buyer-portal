@@ -78,7 +78,7 @@ export default function OrderAction(nsItemDetails: any) {
   }
 
   const handleOpenDialog = (name: string) => {
-    if (!isAgenting && +role === 3) {
+    if (!isAgenting && Number(role) === 3) {
       snackbar.error(b3Lang('orderDetail.orderCard.errorMasquerade'));
       return;
     }

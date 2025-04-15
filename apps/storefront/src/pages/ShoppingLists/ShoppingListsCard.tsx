@@ -10,14 +10,15 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import isEmpty from 'lodash-es/isEmpty';
 
 import CustomButton from '@/components/button/CustomButton';
 import { rolePermissionSelector, useAppSelector } from '@/store';
-import { displayFormat, getB3PermissionsList } from '@/utils';
+import { ShoppingListStatus } from '@/types/shoppingList';
+import { displayFormat, verifyLevelPermission } from '@/utils';
+import { b2bPermissionsMap } from '@/utils/b3CheckPermissions/config';
 
 import { ShoppingListsItemsProps } from './config';
-import { ShoppingStatus } from './ShoppingStatus';
+import { ShoppingListStatusTag } from './ShoppingListStatusTag';
 
 export interface OrderItemCardProps {
   item: ShoppingListsItemsProps;
@@ -26,11 +27,6 @@ export interface OrderItemCardProps {
   onCopy: (data: ShoppingListsItemsProps) => void;
   isPermissions: boolean;
   isB2BUser: boolean;
-}
-
-interface PermissionLevelInfoProps {
-  permissionType: string;
-  permissionLevel?: number | string;
 }
 
 const Flex = styled('div')(() => ({
@@ -55,29 +51,35 @@ function ShoppingListsCard(props: OrderItemCardProps) {
   const b3Lang = useB3Lang();
 
   const [isCanEditShoppingList, setIsCanEditShoppingList] = useState<boolean>(true);
-  const permissions = useAppSelector(({ company }) => company.permissions);
 
   const { submitShoppingListPermission, approveShoppingListPermission } =
     useAppSelector(rolePermissionSelector);
 
   const getEditPermissions = (status: number) => {
     if (submitShoppingListPermission) {
-      if (status === 30 || status === 0) return false;
+      if (status === ShoppingListStatus.Draft || status === ShoppingListStatus.Approved)
+        return false;
       return true;
     }
 
-    if (status === 40) return true;
+    if (status === ShoppingListStatus.ReadyForApproval) return true;
 
     return false;
   };
 
-  const getDeletePermissions = (status: number) => {
-    if (submitShoppingListPermission) {
-      if (status === 20 || status === 30) return false;
+  const shoppingListCanBeDeleted = (status: number) => {
+    if (!submitShoppingListPermission) {
       return true;
     }
 
-    return false;
+    // Status code 20 was previously misused as Rejected in the frontend, which is actually Deleted
+    // We need to add Deleted here so that the shopping lists that were previously rejected remain the same behavior
+    const isInDeletableStatus =
+      status === ShoppingListStatus.Deleted ||
+      status === ShoppingListStatus.Draft ||
+      status === ShoppingListStatus.Rejected;
+
+    return isInDeletableStatus;
   };
 
   const navigate = useNavigate();
@@ -91,24 +93,17 @@ function ShoppingListsCard(props: OrderItemCardProps) {
 
   useEffect(() => {
     if (isB2BUser) {
-      const editShoppingListPermission = permissions.find(
-        (item) => item.code === 'deplicate_shopping_list',
-      );
-      const param: PermissionLevelInfoProps[] = [];
-      if (editShoppingListPermission && !isEmpty(editShoppingListPermission)) {
-        const currentLevel = editShoppingListPermission.permissionLevel;
-        const isOwner = shoppingList?.isOwner || false;
-        param.push({
-          permissionType: 'shoppingListActionsPermission',
-          permissionLevel: currentLevel === 1 && isOwner ? currentLevel : 2,
-        });
-      }
-      const { shoppingListActionsPermission } = getB3PermissionsList(param);
+      const { companyInfo, customerInfo } = shoppingList;
+
+      const { shoppingListCreateActionsPermission } = b2bPermissionsMap;
+      const shoppingListActionsPermission = verifyLevelPermission({
+        code: shoppingListCreateActionsPermission,
+        companyId: Number(companyInfo?.companyId || 0),
+        userId: Number(customerInfo.userId),
+      });
 
       setIsCanEditShoppingList(shoppingListActionsPermission);
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shoppingList, isB2BUser]);
 
   return (
@@ -150,7 +145,7 @@ function ShoppingListsCard(props: OrderItemCardProps) {
                   pb: '25px',
                 }}
               >
-                <ShoppingStatus status={shoppingList.status} />
+                <ShoppingListStatusTag status={shoppingList.status} />
               </Box>
             )}
           <Box
@@ -190,7 +185,7 @@ function ShoppingListsCard(props: OrderItemCardProps) {
           </CustomButton>
           <Box
             sx={{
-              display: `${isPermissions ? 'block' : 'none'}`,
+              display: isPermissions ? 'block' : 'none',
             }}
           >
             {!getEditPermissions(shoppingList.status) && isCanEditShoppingList && (
@@ -220,7 +215,7 @@ function ShoppingListsCard(props: OrderItemCardProps) {
             >
               <ContentCopyIcon fontSize="inherit" />
             </IconButton>
-            {!getDeletePermissions(shoppingList.status) && isCanEditShoppingList && (
+            {shoppingListCanBeDeleted(shoppingList.status) && isCanEditShoppingList && (
               <IconButton
                 aria-label="delete"
                 size="medium"

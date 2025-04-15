@@ -5,13 +5,14 @@ import { Box, ImageListItem } from '@mui/material';
 
 import { B3Card } from '@/components';
 import B3Spin from '@/components/spin/B3Spin';
+import { LOGIN_LANDING_LOCATIONS } from '@/constants';
 import { useMobile, useScrollBar } from '@/hooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import { getB2BAccountFormFields, getB2BCountries } from '@/shared/service/b2b';
 import { bcLogin } from '@/shared/service/bc';
 import { themeFrameSelector, useAppSelector } from '@/store';
-import { B3SStorage, loginJump } from '@/utils';
+import { B3SStorage, loginJump, platform } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
 
@@ -48,7 +49,7 @@ function Registered(props: PageProps) {
 
   const {
     state: { isCheckout, isCloseGotoBCHome, logo, storeName, registerEnabled },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const {
     state: {
@@ -73,9 +74,7 @@ function Registered(props: PageProps) {
     if (!registerEnabled) {
       navigate('/login');
     }
-    // disabling as we dont need to check for any changes in the navigate function
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerEnabled]);
+  }, [navigate, registerEnabled]);
 
   useEffect(() => {
     const getBCAdditionalFields = async () => {
@@ -186,8 +185,6 @@ function Registered(props: PageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isStepOptional = (step: number) => step === -1;
-
   const getLoginData = () => {
     const emailAddress =
       ((accountType === '1' ? contactInformation : bcContactInformation).find(
@@ -275,6 +272,20 @@ function Registered(props: PageProps) {
 
         const isLoginLandLocation = loginJump(navigate);
 
+        if (platform === 'catalyst') {
+          const landingLoginLocation = isLoginLandLocation
+            ? LOGIN_LANDING_LOCATIONS.HOME
+            : LOGIN_LANDING_LOCATIONS.BUYER_PORTAL;
+
+          window.b2b.callbacks.dispatchEvent('on-registered', {
+            email: data.emailAddress,
+            password: data.password,
+            landingLoginLocation,
+          });
+          window.location.hash = '';
+          return;
+        }
+
         if (!isLoginLandLocation) return;
 
         if (isCloseGotoBCHome) {
@@ -325,15 +336,11 @@ function Registered(props: PageProps) {
                     window.location.href = '/';
                   }}
                 >
-                  <img src={`${logo}`} alt={b3Lang('global.tips.registerLogo')} loading="lazy" />
+                  <img src={logo} alt={b3Lang('global.tips.registerLogo')} loading="lazy" />
                 </ImageListItem>
               </RegisteredImage>
             )}
-            <RegisteredStep
-              activeStep={activeStep}
-              isStepOptional={isStepOptional}
-              backgroundColor={backgroundColor}
-            >
+            <RegisteredStep activeStep={activeStep} backgroundColor={backgroundColor}>
               <RegisterContent
                 activeStep={activeStep}
                 handleBack={handleBack}

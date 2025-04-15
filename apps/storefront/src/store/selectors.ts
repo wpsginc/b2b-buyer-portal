@@ -2,8 +2,8 @@ import { createSelector } from '@reduxjs/toolkit';
 
 import { RootState } from '@/store';
 import { CompanyStatus, Currency, CustomerRole, UserTypes } from '@/types';
-import { checkEveryPermissionsCode } from '@/utils/b3CheckPermissions/permission';
-import { b2bPermissionsList, B2BPermissionsparms } from '@/utils/b3RolePermissions/config';
+import { getCorrespondsConfigurationPermission } from '@/utils/b3CheckPermissions/base';
+import { B2BPermissionsMapParams } from '@/utils/b3CheckPermissions/config';
 
 import { defaultCurrenciesState } from './slices/storeConfigs';
 
@@ -27,7 +27,7 @@ export const activeCurrencyInfoSelector = createSelector(
   (storeConfigs): Currency => {
     const entityId = storeConfigs.activeCurrency?.node.entityId || '';
     const activeCurrency = storeConfigs.currencies.currencies.find(
-      (currency) => +currency.id === +entityId,
+      (currency) => Number(currency.id) === Number(entityId),
     );
 
     return activeCurrency || defaultCurrenciesState.currencies[0];
@@ -49,7 +49,7 @@ export const isB2BUserSelector = createSelector(
   (company) =>
     (company.customer.userType === UserTypes.MULTIPLE_B2C &&
       company.companyInfo.status === CompanyStatus.APPROVED) ||
-    +company.customer.role === CustomerRole.SUPER_ADMIN,
+    Number(company.customer.role) === CustomerRole.SUPER_ADMIN,
 );
 
 interface OptionList {
@@ -59,24 +59,11 @@ interface OptionList {
 
 export const rolePermissionSelector = createSelector(
   companySelector,
-  ({ permissions }): B2BPermissionsparms => {
-    const keys = Object.keys(b2bPermissionsList);
-
-    const newB3PermissionsList: Record<string, string> = b2bPermissionsList;
-
-    return keys.reduce((acc, cur: string) => {
-      const param = {
-        code: newB3PermissionsList[cur],
-      };
-
-      const item = checkEveryPermissionsCode(param, permissions);
-
-      return {
-        ...acc,
-        [cur]: item,
-      };
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    }, {} as B2BPermissionsparms);
+  ({
+    permissions,
+    companyHierarchyInfo: { selectCompanyHierarchyId },
+  }): B2BPermissionsMapParams => {
+    return getCorrespondsConfigurationPermission(permissions, Number(selectCompanyHierarchyId));
   },
 );
 
@@ -90,8 +77,8 @@ export const formattedQuoteDraftListSelector = createSelector(quoteInfoSelector,
         const optionIdFormatted = optionId.match(/\d+/);
 
         return {
-          optionId: optionIdFormatted?.[0] ? +optionIdFormatted[0] : optionId,
-          optionValue: +optionValue,
+          optionId: optionIdFormatted?.[0] ? Number(optionIdFormatted[0]) : optionId,
+          optionValue: Number(optionValue),
         };
       });
 
@@ -110,10 +97,10 @@ export const isValidUserTypeSelector = createSelector(
     const isB2BUser =
       (customer.userType === UserTypes.MULTIPLE_B2C &&
         companyInfo.status === CompanyStatus.APPROVED) ||
-      +customer.role === CustomerRole.SUPER_ADMIN;
+      Number(customer.role) === CustomerRole.SUPER_ADMIN;
 
     if (isB2BUser) {
-      return userType === UserTypes.DOESNT_EXIST;
+      return userType === UserTypes.DOES_NOT_EXIST;
     }
 
     return userType !== UserTypes.B2C;

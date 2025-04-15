@@ -1,4 +1,5 @@
 import { useContext } from 'react';
+import { useB3Lang } from '@b3/lang';
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material';
 
 import { B3ProductList } from '@/components';
@@ -7,12 +8,18 @@ import { useMobile } from '@/hooks';
 import { OrderBillings } from '../../../types';
 import { OrderDetailsContext } from '../context/OrderDetailsContext';
 
-export default function OrderBilling() {
+type OrderBillingProps = {
+  isCurrentCompany: boolean;
+};
+
+export default function OrderBilling({ isCurrentCompany }: OrderBillingProps) {
   const {
-    state: { billings = [], addressLabelPermission, orderId, orderIsDigital },
+    state: { billings = [], addressLabelPermission, orderId },
   } = useContext(OrderDetailsContext);
 
   const [isMobile] = useMobile();
+
+  const b3Lang = useB3Lang();
 
   const getFullName = (billing: OrderBillings) => {
     const { billingAddress } = billing;
@@ -48,7 +55,13 @@ export default function OrderBilling() {
     return company.substring(index + 1, company.length);
   };
 
-  return orderIsDigital ? (
+  const hasDigitalProducts = billings.some((billing) => billing.digitalProducts.length > 0);
+
+  if (!hasDigitalProducts) {
+    return null;
+  }
+
+  return (
     <Stack spacing={2}>
       {billings.map((billingItem: OrderBillings) => (
         <Card key={`billing-${orderId}`}>
@@ -81,15 +94,25 @@ export default function OrderBilling() {
               </Typography>
             </Box>
 
+            <Box
+              sx={{
+                margin: '20px 0 2px',
+              }}
+            >
+              <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#313440' }}>
+                {b3Lang('orderDetail.billing.digitalProducts')}
+              </Typography>
+            </Box>
+
             <B3ProductList
-              products={billingItem.products}
+              products={billingItem.digitalProducts}
               totalText="Total"
-              canToProduct
+              canToProduct={isCurrentCompany}
               textAlign={isMobile ? 'left' : 'right'}
             />
           </CardContent>
         </Card>
       ))}
     </Stack>
-  ) : null;
+  );
 }

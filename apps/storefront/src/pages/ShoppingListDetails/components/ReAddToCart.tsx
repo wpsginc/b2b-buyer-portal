@@ -11,10 +11,11 @@ import B3Spin from '@/components/spin/B3Spin';
 import { CART_URL, CHECKOUT_URL, PRODUCT_DEFAULT_IMAGE } from '@/constants';
 import { useMobile } from '@/hooks';
 import { activeCurrencyInfoSelector, rolePermissionSelector, useAppSelector } from '@/store';
+import { ShoppingListStatus } from '@/types/shoppingList';
 import { currencyFormat, snackbar } from '@/utils';
 import { setModifierQtyPrice } from '@/utils/b3Product/b3Product';
 import {
-  addlineItems,
+  addLineItems,
   getProductOptionsFields,
   ProductsProps,
 } from '@/utils/b3Product/shared/config';
@@ -189,11 +190,11 @@ export default function ReAddToCart(props: ShoppingProductsProps) {
     isValid: boolean,
   ) => {
     const newProduct: ProductsProps[] = [...products];
-    newProduct[index].node.quantity = +value;
+    newProduct[index].node.quantity = Number(value);
     newProduct[index].isValid = isValid;
-    const caculateProduct = await setModifierQtyPrice(newProduct[index].node, +value);
-    if (caculateProduct) {
-      (newProduct[index] as CustomFieldItems).node = caculateProduct;
+    const calculateProduct = await setModifierQtyPrice(newProduct[index].node, Number(value));
+    if (calculateProduct) {
+      (newProduct[index] as CustomFieldItems).node = calculateProduct;
       setValidateFailureProducts(newProduct);
     }
   };
@@ -220,7 +221,7 @@ export default function ReAddToCart(props: ShoppingProductsProps) {
     try {
       setLoading(true);
 
-      const lineItems = addlineItems(products);
+      const lineItems = addLineItems(products);
 
       const res = await callCart(lineItems);
 
@@ -229,7 +230,7 @@ export default function ReAddToCart(props: ShoppingProductsProps) {
         if (
           allowJuniorPlaceOrder &&
           submitShoppingListPermission &&
-          shoppingListInfo?.status === 0
+          shoppingListInfo?.status === ShoppingListStatus.Approved
         ) {
           window.location.href = CHECKOUT_URL;
         } else {
@@ -280,13 +281,13 @@ export default function ReAddToCart(props: ShoppingProductsProps) {
       } else if (maxQuantity !== 0 && quantityNumber > maxQuantity) {
         item.node.quantity = maxQuantity;
       }
-      if (isStock !== '0' && stock && (quantity ? +quantity : 0) > stock) {
+      if (isStock !== '0' && stock && (quantity ? Number(quantity) : 0) > stock) {
         item.node.quantity = stock;
       }
 
       item.isValid = true;
 
-      const qty = product?.node?.quantity ? +product.node.quantity : 0;
+      const qty = product?.node?.quantity ? Number(product.node.quantity) : 0;
 
       requestArr.push(setModifierQtyPrice(product.node, qty));
     });
@@ -410,8 +411,8 @@ export default function ReAddToCart(props: ShoppingProductsProps) {
                   basePrice,
                 } = product.node;
 
-                const price = +basePrice;
-                const total = (price * (quantity ? +quantity : 0)).toFixed(decimalPlaces);
+                const price = Number(basePrice);
+                const total = (price * (quantity ? Number(quantity) : 0)).toFixed(decimalPlaces);
 
                 const newProduct: any = {
                   ...productsSearch,
@@ -458,7 +459,7 @@ export default function ReAddToCart(props: ShoppingProductsProps) {
                     </FlexItem>
                     <FlexItem {...itemStyle.default} textAlignLocation={textAlign}>
                       {isMobile && <span>Price: </span>}
-                      {`${currencyFormat(price)}`}
+                      {currencyFormat(price)}
                     </FlexItem>
                     <FlexItem {...itemStyle.default} textAlignLocation={textAlign}>
                       <B3QuantityTextField
@@ -474,7 +475,7 @@ export default function ReAddToCart(props: ShoppingProductsProps) {
                     </FlexItem>
                     <FlexItem {...itemStyle.default} textAlignLocation={textAlign}>
                       {isMobile && <div>Total: </div>}
-                      {`${currencyFormat(total)}`}
+                      {currencyFormat(total)}
                     </FlexItem>
 
                     <FlexItem {...itemStyle.delete}>
