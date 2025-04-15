@@ -7,7 +7,7 @@ import { useAppSelector } from '@/store';
 import { BcCartData, BcCartDataLineItem, InvoiceListNode } from '@/types/invoice';
 import { handleGetCorrespondingCurrencyToken, snackbar } from '@/utils';
 
-import { gotoInvoiceCheckoutUrl } from '../utils/payment';
+import { formattingNumericValues, gotoInvoiceCheckoutUrl } from '../utils/payment';
 
 interface InvoiceFooterProps {
   selectedPay: CustomFieldItems;
@@ -44,16 +44,21 @@ function InvoiceFooter(props: InvoiceFooterProps) {
           node: { id, openBalance, originalBalance },
         } = item;
 
+        const currentValue =
+          formattingNumericValues(Number(openBalance.originValue), decimalPlaces) ===
+          openBalance.value
+            ? Number(openBalance.originValue)
+            : Number(openBalance.value);
         lineItems.push({
-          invoiceId: +id,
-          amount: openBalance.value === '.' ? '0' : `${+openBalance.value}`,
+          invoiceId: Number(id),
+          amount: openBalance.value === '.' ? '0' : `${Number(currentValue)}`,
         });
 
         currency = openBalance?.code || originalBalance.code;
       });
 
       const badItem = lineItems.find(
-        (item: CustomFieldItems) => item.amount === '.' || +item.amount === 0,
+        (item: CustomFieldItems) => item.amount === '.' || Number(item.amount) === 0,
       );
       if (badItem) {
         snackbar.error(b3Lang('invoice.footer.invalidNameError'), {
@@ -81,10 +86,10 @@ function InvoiceFooter(props: InvoiceFooterProps) {
           const {
             node: { openBalance },
           } = item;
-          amount += openBalance.value === '.' ? 0 : +openBalance.value;
+          amount += openBalance.value === '.' ? 0 : Number(openBalance.value);
         });
 
-        setSelectedAccount(amount.toFixed(decimalPlaces));
+        setSelectedAccount(formattingNumericValues(amount, decimalPlaces));
       };
       const {
         node: { openBalance },

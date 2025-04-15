@@ -15,13 +15,15 @@ export interface InvoiceItemCardProps {
   item: any;
   checkBox?: (disable: boolean) => ReactElement;
   handleSetSelectedInvoiceAccount: (value: string, id: string) => void;
-  handleViewInvoice: (id: string, status: string | number) => void;
+  handleViewInvoice: (id: string, status: string | number, invoiceCompanyId: string) => void;
   setIsRequestLoading: (bool: boolean) => void;
   setInvoiceId: (id: string) => void;
   handleOpenHistoryModal: (bool: boolean) => void;
   selectedPay: CustomFieldItems | InvoiceListNode[];
   handleGetCorrespondingCurrency: (code: string) => string;
   addBottom: boolean;
+  isCurrentCompany: boolean;
+  invoicePay: boolean;
 }
 
 const StyleCheckoutContainer = styled(Box)(() => ({
@@ -43,11 +45,13 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
     selectedPay = [],
     handleGetCorrespondingCurrency,
     addBottom,
+    isCurrentCompany,
+    invoicePay,
   } = props;
   const b3Lang = useB3Lang();
   const navigate = useNavigate();
 
-  const { id, status, dueDate, openBalance } = item;
+  const { id, status, dueDate, openBalance, companyInfo } = item;
   const currentCode = openBalance.code || 'USD';
   const currentCurrencyToken = handleGetCorrespondingCurrency(currentCode);
 
@@ -78,7 +82,7 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
     {
       key: 'createdAt',
       title: b3Lang('invoice.invoiceItemCardHeader.invoiceDate'),
-      render: () => `${item.createdAt ? displayFormat(+item.createdAt) : '–'}`,
+      render: () => `${item.createdAt ? displayFormat(Number(item.createdAt)) : '–'}`,
     },
     {
       key: 'updatedAt',
@@ -94,7 +98,7 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
               fontSize: '14px',
             }}
           >
-            {`${item.dueDate ? displayFormat(+item.dueDate) : '–'}`}
+            {`${item.dueDate ? displayFormat(Number(item.dueDate)) : '–'}`}
           </Typography>
         );
       },
@@ -104,7 +108,7 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
       title: b3Lang('invoice.invoiceItemCardHeader.invoiceTotal'),
       render: () => {
         const { originalBalance } = item;
-        const originalAmount = +originalBalance.value;
+        const originalAmount = Number(originalBalance.value);
 
         return currencyFormat(originalAmount || 0);
       },
@@ -115,7 +119,7 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
       render: () => {
         const { openBalance } = item;
 
-        const openAmount = +openBalance.value;
+        const openAmount = Number(openBalance.value);
 
         return currencyFormat(openAmount || 0);
       },
@@ -134,7 +138,7 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
               node: { id: selectedId },
             } = item;
 
-            return +selectedId === +id;
+            return Number(selectedId) === Number(id);
           });
 
           if (currentSelected) {
@@ -145,7 +149,7 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
             disabled = false;
             valuePrice = selectedOpenBalance.value;
 
-            if (+openBalance.value === 0) {
+            if (Number(openBalance.value) === 0) {
               disabled = true;
             }
           }
@@ -223,7 +227,7 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
                   textDecoration: 'underline',
                 }}
                 onClick={() => {
-                  handleViewInvoice(id, status);
+                  handleViewInvoice(id, status, companyInfo.companyId);
                 }}
               >
                 {id || '-'}
@@ -236,6 +240,8 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
               setInvoiceId={setInvoiceId}
               handleOpenHistoryModal={handleOpenHistoryModal}
               setIsRequestLoading={setIsRequestLoading}
+              isCurrentCompany={isCurrentCompany}
+              invoicePay={invoicePay}
             />
           </Box>
         </Box>

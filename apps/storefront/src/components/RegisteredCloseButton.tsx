@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 
 import { type SetOpenPage } from '@/pages/SetOpenPage';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 
 import { CloseButton } from './styled';
 
@@ -16,11 +16,12 @@ export default function RegisteredCloseButton(props: CloseButtonProps) {
 
   const {
     state: { isCloseGotoBCHome },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
   const navigate = useNavigate();
 
   const handleCloseForm = () => {
-    if (isCloseGotoBCHome) {
+    const isInLoginPage = window.location.hash.startsWith('#/login');
+    if (isCloseGotoBCHome || isInLoginPage) {
       window.location.href = '/';
     } else {
       navigate('/');
@@ -29,6 +30,7 @@ export default function RegisteredCloseButton(props: CloseButtonProps) {
         openUrl: '',
       });
     }
+
     window.history.replaceState(null, '', window.location.pathname || '/');
   };
 

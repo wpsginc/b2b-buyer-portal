@@ -18,7 +18,7 @@ import { successTip } from '@/components';
 import CustomButton from '@/components/button/CustomButton';
 import { CART_URL, PRODUCT_DEFAULT_IMAGE } from '@/constants';
 import { useMobile } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   addProductToBcShoppingList,
   addProductToShoppingList,
@@ -26,7 +26,7 @@ import {
   searchBcProducts,
 } from '@/shared/service/b2b';
 import { activeCurrencyInfoSelector, rolePermissionSelector, useAppSelector } from '@/store';
-import { currencyFormat, getProductPriceIncTax, snackbar } from '@/utils';
+import { currencyFormat, getProductPriceIncTaxOrExTaxBySetting, snackbar } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 import {
   addQuoteDraftProducts,
@@ -40,6 +40,7 @@ import { callCart } from '@/utils/cartUtils';
 
 import CreateShoppingList from '../../OrderDetail/components/CreateShoppingList';
 import OrderShoppingList from '../../OrderDetail/components/OrderShoppingList';
+import { addCartProductToVerify, CheckedProduct } from '../utils';
 
 export interface ProductInfoProps {
   basePrice: number | string;
@@ -98,7 +99,7 @@ interface ProductsProps {
 }
 
 interface QuickOrderFooterProps {
-  checkedArr: CustomFieldItems;
+  checkedArr: CheckedProduct[];
   isAgenting: boolean;
   setIsRequestLoading: Dispatch<SetStateAction<boolean>>;
   isB2BUser: boolean;
@@ -108,7 +109,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
   const { checkedArr, isAgenting, setIsRequestLoading, isB2BUser } = props;
   const {
     state: { productQuoteEnabled = false, shoppingListEnabled = false },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
   const b3Lang = useB3Lang();
   const companyInfoId = useAppSelector((state) => state.company.companyInfo.id);
   const { currency_code: currencyCode } = useAppSelector(activeCurrencyInfoSelector);
@@ -154,11 +155,11 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
   const handleSetCartLineItems = (inventoryInfos: ProductsProps[]) => {
     const lineItems: CustomFieldItems[] = [];
 
-    checkedArr.forEach((item: ProductsProps) => {
+    checkedArr.forEach((item: CheckedProduct) => {
       const { node } = item;
 
       const currentProduct: CustomFieldItems | undefined = inventoryInfos.find(
-        (inventory: CustomFieldItems) => +node.productId === inventory.id,
+        (inventory: CustomFieldItems) => Number(node.productId) === inventory.id,
       );
       if (currentProduct) {
         const { variants }: CustomFieldItems = currentProduct;
@@ -166,7 +167,8 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
         if (variants.length > 0) {
           const currentInventoryInfo: CustomFieldItems | undefined = variants.find(
             (variant: CustomFieldItems) =>
-              node.variantSku === variant.sku && +node.variantId === +variant.variant_id,
+              node.variantSku === variant.sku &&
+              Number(node.variantId) === Number(variant.variant_id),
           );
 
           if (currentInventoryInfo) {
@@ -198,11 +200,11 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
     try {
       const productIds: number[] = [];
 
-      checkedArr.forEach((item: ProductsProps) => {
+      checkedArr.forEach((item: CheckedProduct) => {
         const { node } = item;
 
-        if (!productIds.includes(+node.productId)) {
-          productIds.push(+node.productId);
+        if (!productIds.includes(Number(node.productId))) {
+          productIds.push(Number(node.productId));
         }
       });
 
@@ -210,6 +212,10 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
         snackbar.error(b3Lang('purchasedProducts.footer.selectOneItemToAdd'));
         return;
       }
+
+      const isPassVerify = await addCartProductToVerify(checkedArr, b3Lang);
+
+      if (!isPassVerify) return;
 
       const companyId = companyInfoId;
 
@@ -274,7 +280,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
     setIsRequestLoading(true);
     handleClose();
     try {
-      const productsWithSku = checkedArr.filter((checkedItem: ListItemProps) => {
+      const productsWithSku = checkedArr.filter((checkedItem: CheckedProduct) => {
         const {
           node: { variantSku },
         } = checkedItem;
@@ -282,7 +288,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
         return variantSku !== '' && variantSku !== null && variantSku !== undefined;
       });
 
-      const noSkuProducts = checkedArr.filter((checkedItem: ListItemProps) => {
+      const noSkuProducts = checkedArr.filter((checkedItem: CheckedProduct) => {
         const {
           node: { variantSku },
         } = checkedItem;
@@ -297,11 +303,11 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
       if (noSkuProducts.length === checkedArr.length) return;
 
       const productIds: number[] = [];
-      productsWithSku.forEach((product: ListItemProps) => {
+      productsWithSku.forEach((product: CheckedProduct) => {
         const { node } = product;
 
-        if (!productIds.includes(+node.productId)) {
-          productIds.push(+node.productId);
+        if (!productIds.includes(Number(node.productId))) {
+          productIds.push(Number(node.productId));
         }
       });
 
@@ -319,7 +325,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
       let isFondVariant = true;
 
       const newProducts: CustomFieldItems[] = [];
-      productsWithSku.forEach((product: ListItemProps) => {
+      productsWithSku.forEach((product: CheckedProduct) => {
         const {
           node: {
             basePrice,
@@ -336,7 +342,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
         const optionsList = getOptionsList(optionList);
 
         const currentProductSearch = newProductInfo.find(
-          (product: CustomFieldItems) => +product.id === +productId,
+          (product: CustomFieldItems) => Number(product.id) === Number(productId),
         );
 
         const variantItem = currentProductSearch?.variants.find(
@@ -345,7 +351,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
 
         if (!variantItem) {
           errorMessage = b3Lang('purchasedProducts.footer.notFoundSku', {
-            sku: variantSku,
+            sku: variantSku as string,
           });
           isFondVariant = false;
         }
@@ -358,7 +364,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
             productsSearch: currentProductSearch,
             primaryImage: variantItem?.image_url || PRODUCT_DEFAULT_IMAGE,
             productName,
-            quantity: +quantity || 1,
+            quantity: Number(quantity) || 1,
             optionList: JSON.stringify(optionsList),
             productId,
             basePrice,
@@ -479,17 +485,17 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
     setIisShoppingListLoading(true);
     try {
       const productIds: number[] = [];
-      checkedArr.forEach((product: ListItemProps) => {
+      checkedArr.forEach((product: CheckedProduct) => {
         const { node } = product;
 
-        if (!productIds.includes(+node.productId)) {
-          productIds.push(+node.productId);
+        if (!productIds.includes(Number(node.productId))) {
+          productIds.push(Number(node.productId));
         }
       });
 
       const items: CustomFieldItems = [];
 
-      checkedArr.forEach((product: ListItemProps) => {
+      checkedArr.forEach((product: CheckedProduct) => {
         const {
           node: { optionList, productId, quantity, variantId, productsSearch },
         } = product;
@@ -498,16 +504,16 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
 
         const newOptionLists = getValidOptionsList(optionsList, productsSearch);
         items.push({
-          productId: +productId,
-          variantId: +variantId,
-          quantity: +quantity,
+          productId: Number(productId),
+          variantId: Number(variantId),
+          quantity: Number(quantity),
           optionList: newOptionLists,
         });
       });
 
       const addToShoppingList = isB2BUser ? addProductToShoppingList : addProductToBcShoppingList;
       await addToShoppingList({
-        shoppingListId: +shoppingListId,
+        shoppingListId: Number(shoppingListId),
         items,
       });
 
@@ -548,7 +554,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
     if (checkedArr.length > 0) {
       let total = 0.0;
 
-      checkedArr.forEach((item: ListItemProps) => {
+      checkedArr.forEach((item: CheckedProduct) => {
         const {
           node: {
             variantId,
@@ -559,10 +565,12 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
         } = item;
 
         if (variants?.length) {
-          const priceIncTax = getProductPriceIncTax(variants, +variantId) || +basePrice;
-          total += priceIncTax * +quantity;
+          const priceIncTax =
+            getProductPriceIncTaxOrExTaxBySetting(variants, Number(variantId)) ||
+            Number(basePrice || 0);
+          total += priceIncTax * Number(quantity);
         } else {
-          total += +basePrice * +quantity;
+          total += Number(basePrice || 0) * Number(quantity);
         }
       });
 
@@ -715,7 +723,7 @@ function QuickOrderFooter(props: QuickOrderFooterProps) {
               <Box
                 sx={{
                   width: '33.3333%',
-                  display: !isMobile ? 'block' : 'none',
+                  display: isMobile ? 'none' : 'block',
                 }}
               />
             </Box>

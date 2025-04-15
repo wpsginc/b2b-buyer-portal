@@ -4,7 +4,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "cache": false
     },
     "lint": {},
     "format": {},
@@ -12,6 +13,11 @@
       "cache": false
     },
     "build:staging": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "cache": false
+    },
+    "build:tier1": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },

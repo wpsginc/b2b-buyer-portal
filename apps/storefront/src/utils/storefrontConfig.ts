@@ -1,11 +1,13 @@
 import isEmpty from 'lodash-es/isEmpty';
 
+import { LOGIN_LANDING_LOCATIONS } from '@/constants';
 import { CustomStyleButtonState } from '@/shared/customStyleButton/context/config';
 import { DispatchProps } from '@/shared/global/context/config';
 import {
   getB2BRegisterLogo,
   getBCStoreChannelId,
   getCurrencies,
+  getStoreConfigsSwitchStatus,
   getStorefrontConfig,
   getStorefrontConfigs,
   getStorefrontDefaultLanguages,
@@ -17,6 +19,7 @@ import {
   setBlockPendingAccountViewPrice,
   setBlockPendingQuoteNonPurchasableOOS,
   setLoginLandingLocation,
+  setQuoteSubmissionResponse,
   setShowInclusiveTaxPrice,
   setStoreInfo,
   setTaxZoneRates,
@@ -24,7 +27,7 @@ import {
 import { setActiveCurrency, setCurrencies } from '@/store/slices/storeConfigs';
 import { B3SStorage, channelId } from '@/utils';
 
-interface StoreforntKeysProps {
+interface StorefrontKeysProps {
   key: string;
   name: string;
 }
@@ -57,7 +60,7 @@ interface TaxZoneRatesProps {
   name: string;
 }
 
-const storeforntKeys: StoreforntKeysProps[] = [
+const storefrontKeys: StorefrontKeysProps[] = [
   {
     key: 'quote_on_product_page',
     name: 'addQuoteBtn',
@@ -89,6 +92,10 @@ const storeforntKeys: StoreforntKeysProps[] = [
   {
     key: 'masquerade_button',
     name: 'masqueradeButton',
+  },
+  {
+    key: 'switch_account_button',
+    name: 'switchAccountButton',
   },
   {
     key: 'quote_floating_action_button',
@@ -139,6 +146,10 @@ const storeforntKeys: StoreforntKeysProps[] = [
     name: 'nonPurchasableQuote',
   },
   {
+    key: 'quote_auto_quoting',
+    name: 'quoteAutoQuoting',
+  },
+  {
     key: 'buyer_non_purchasable_quote',
     name: 'buyerNonPurchasableQuote',
   },
@@ -150,10 +161,14 @@ const storeforntKeys: StoreforntKeysProps[] = [
     key: 'login_landing_location',
     name: 'loginLandingLocation',
   },
+  {
+    key: 'quote_submission_response',
+    name: 'quoteSubmissionResponse',
+  },
 ];
 
 const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
-  const keys = storeforntKeys.map((item: StoreforntKeysProps) => item.key);
+  const keys = storefrontKeys.map((item: StorefrontKeysProps) => item.key);
   const { storefrontConfigs } = await getStorefrontConfigs(channelId, keys);
 
   let logo = '';
@@ -163,15 +178,15 @@ const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
   let blockPendingAccountViewPrice = true;
   storefrontConfigs.forEach((currentItem: CustomFieldItems) => {
     const item = currentItem;
-    const storeforntKey: StoreforntKeysProps | undefined = storeforntKeys.find(
+    const storefrontKey: StorefrontKeysProps | undefined = storefrontKeys.find(
       (option) => option.key === item.key,
     );
     const storefrontConfig = item;
-    if (!isEmpty(storeforntKey)) {
-      if (storeforntKey.key === 'quote_logo') {
+    if (!isEmpty(storefrontKey)) {
+      if (storefrontKey.key === 'quote_logo') {
         logo = item.value;
       }
-      if (storeforntKey.key === 'quote_on_product_page') {
+      if (storefrontKey.key === 'quote_on_product_page') {
         storefrontConfig.extraFields = {
           ...item.extraFields,
           locationSelector: item.extraFields?.locationSelector || '.add-to-cart-buttons',
@@ -180,13 +195,13 @@ const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
         };
       }
 
-      if (storeforntKey.key === 'quote_on_cart_page') {
+      if (storefrontKey.key === 'quote_on_cart_page') {
         storefrontConfig.extraFields = {
           ...item.extraFields,
           classSelector: item.extraFields?.classSelector || 'button',
         };
       }
-      if (storeforntKey.key === 'masquerade_button') {
+      if (storefrontKey.key === 'masquerade_button') {
         storefrontConfig.extraFields = {
           ...item.extraFields,
           color: item.extraFields?.color || '#ED6C02',
@@ -196,7 +211,17 @@ const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
         };
       }
 
-      if (storeforntKey.key === 'quote_floating_action_button') {
+      if (storefrontKey.key === 'switch_account_button') {
+        storefrontConfig.extraFields = {
+          ...item.extraFields,
+          color: item.extraFields?.color || '#ED6C02',
+          location: item.extraFields?.location || ' bottomLeft',
+          horizontalPadding: item.extraFields?.horizontalPadding || '',
+          verticalPadding: item.extraFields?.verticalPadding || '',
+        };
+      }
+
+      if (storefrontKey.key === 'quote_floating_action_button') {
         storefrontConfig.extraFields = {
           ...item.extraFields,
           color: item.extraFields?.color || '#E00F36',
@@ -206,7 +231,7 @@ const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
         };
       }
 
-      if (storeforntKey.key === 'shopping_list_on_product_page') {
+      if (storefrontKey.key === 'shopping_list_on_product_page') {
         storefrontConfig.extraFields = {
           ...item.extraFields,
           locationSelector: item.extraFields?.locationSelector || '.add-to-cart-buttons',
@@ -215,18 +240,18 @@ const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
         };
       }
 
-      if (storeforntKey.key === 'block_pending_account_order_creation') {
+      if (storefrontKey.key === 'block_pending_account_order_creation') {
         blockPendingAccountOrderCreation = item.value === '1';
         B3SStorage.set('blockPendingAccountOrderCreation', blockPendingAccountOrderCreation);
       }
 
-      if (storeforntKey.key === 'block_pending_account_seeing_products_pricing') {
+      if (storefrontKey.key === 'block_pending_account_seeing_products_pricing') {
         blockPendingAccountViewPrice = item.value === '1';
         B3SStorage.set('blockPendingAccountViewPrice', blockPendingAccountViewPrice);
         store.dispatch(setBlockPendingAccountViewPrice(blockPendingAccountViewPrice));
       }
 
-      if (storeforntKey.key === 'non_purchasable_quote') {
+      if (storefrontKey.key === 'non_purchasable_quote') {
         store.dispatch(
           setBlockPendingQuoteNonPurchasableOOS({
             isEnableProduct: item.value === '1',
@@ -234,7 +259,7 @@ const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
         );
       }
 
-      if (storeforntKey.key === 'quote_on_non_purchasable_product_page') {
+      if (storefrontKey.key === 'quote_on_non_purchasable_product_page') {
         storefrontConfig.extraFields = {
           ...item.extraFields,
           locationSelector: item.extraFields?.locationSelector || '.add-to-cart-buttons',
@@ -243,7 +268,7 @@ const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
         };
       }
 
-      if (storeforntKey.key === 'buyer_non_purchasable_quote') {
+      if (storefrontKey.key === 'buyer_non_purchasable_quote') {
         store.dispatch(
           setBlockPendingQuoteNonPurchasableOOS({
             isEnableRequest: item.value === '1',
@@ -251,11 +276,25 @@ const getTemPlateConfig = async (dispatch: any, dispatchGlobal: any) => {
         );
       }
 
-      if (storeforntKey.key === 'login_landing_location') {
-        store.dispatch(setLoginLandingLocation(item?.extraFields?.location || '0'));
+      if (storefrontKey.key === 'login_landing_location') {
+        store.dispatch(
+          setLoginLandingLocation(
+            item?.extraFields?.location || LOGIN_LANDING_LOCATIONS.BUYER_PORTAL,
+          ),
+        );
       }
 
-      (obj as CustomFieldItems)[(storeforntKey as StoreforntKeysProps).name] = {
+      if (storefrontKey.key === 'quote_submission_response') {
+        store.dispatch(
+          setQuoteSubmissionResponse({
+            key: item.key,
+            value: item.value,
+            ...item.extraFields,
+          }),
+        );
+      }
+
+      (obj as CustomFieldItems)[(storefrontKey as StorefrontKeysProps).name] = {
         ...item.extraFields,
         enabled: item.value === '1',
       };
@@ -288,6 +327,14 @@ const getQuoteConfig = async (dispatch: DispatchProps) => {
       quoteConfig,
     },
   });
+};
+
+export const getAccountHierarchyIsEnabled = async () => {
+  const { storeConfigSwitchStatus } = await getStoreConfigsSwitchStatus('account_hierarchy');
+  if (!storeConfigSwitchStatus) return false;
+  const { isEnabled } = storeConfigSwitchStatus;
+
+  return isEnabled === '1';
 };
 
 const setStorefrontConfig = async (dispatch: DispatchProps) => {
@@ -348,7 +395,7 @@ const getStoreTaxZoneRates = async () => {
 };
 
 const getStoreInfo = async () => {
-  const { storeBasicInfo }: CustomFieldItems = await getBCStoreChannelId();
+  const { storeBasicInfo } = await getBCStoreChannelId();
   const [storeInfo] = storeBasicInfo.storeSites;
 
   store.dispatch(setStoreInfo(storeInfo));

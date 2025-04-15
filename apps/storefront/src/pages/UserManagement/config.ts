@@ -1,5 +1,7 @@
 import { LangFormatFunction } from '@b3/lang';
 
+import { CompanyInfoTypes } from '@/types';
+
 interface ExtraFieldsProps {
   fieldName: string;
   fieldValue: string | number;
@@ -17,7 +19,9 @@ interface UsersListItems {
   companyRoleId: number | string;
   updatedAt: number;
   extraFields: ExtraFieldsProps[];
-  [key: string]: string | null | number | ExtraFieldsProps[];
+  masqueradingCompanyId: number | string | null;
+  companyInfo: CompanyInfoTypes | null;
+  [key: string]: string | null | number | ExtraFieldsProps[] | CompanyInfoTypes;
 }
 
 interface FilterProps {
@@ -75,12 +79,12 @@ const getUserRole = () => {
       value: 1,
       idLang: 'userManagement.userRole.seniorBuyer',
     },
-    {
-      label: 'Junior buyer',
-      name: 'Junior Buyer',
-      value: 2,
-      idLang: 'userManagement.userRole.juniorBuyer',
-    },
+    // {
+    //   label: 'Junior buyer',
+    //   name: 'Junior Buyer',
+    //   value: 2,
+    //   idLang: 'userManagement.userRole.juniorBuyer',
+    // },
   ];
 
   return userRole;

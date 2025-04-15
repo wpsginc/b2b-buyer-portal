@@ -1,13 +1,21 @@
-import { useContext } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useContext, useEffect, useMemo } from 'react';
+import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
 import { Badge, List, ListItem, ListItemButton, ListItemText, useTheme } from '@mui/material';
 
 import { useMobile } from '@/hooks';
-import { DynamicallyVariableedContext } from '@/shared/dynamicallyVariable';
-import { GlobaledContext } from '@/shared/global';
+import { DynamicallyVariableContext } from '@/shared/dynamicallyVariable';
+import { GlobalContext } from '@/shared/global';
+import { type RouteItem } from '@/shared/routeList';
 import { getAllowedRoutes } from '@/shared/routes';
-import { useAppSelector } from '@/store';
+import { store, useAppSelector } from '@/store';
+import {
+  setCompanyHierarchyInfoModules,
+  setPagesSubsidiariesPermission,
+} from '@/store/slices/company';
+import { PagesSubsidiariesPermissionProps } from '@/types';
+import { B3SStorage } from '@/utils';
+import { validatePermissionWithComparisonType } from '@/utils/b3CheckPermissions';
 
 import { b3HexToRgb, getContrastColor } from '../outSideComponents/utils/b3CustomStyles';
 
@@ -15,16 +23,41 @@ interface B3NavProps {
   closeSidebar?: (x: boolean) => void;
 }
 
+const getSubsidiariesPermission = (routes: RouteItem[]) => {
+  const subsidiariesPermission = routes.reduce((all, cur) => {
+    if (cur?.subsidiariesCompanyKey) {
+      const code = cur.permissionCodes?.includes(',')
+        ? cur.permissionCodes.split(',')[0].trim()
+        : cur.permissionCodes;
+
+      all[cur.subsidiariesCompanyKey] = validatePermissionWithComparisonType({
+        level: 3,
+        code,
+      });
+    }
+
+    return all;
+  }, {} as PagesSubsidiariesPermissionProps);
+
+  return subsidiariesPermission;
+};
+
 export default function B3Nav({ closeSidebar }: B3NavProps) {
   const [isMobile] = useMobile();
   const navigate = useNavigate();
   const location = useLocation();
   const b3Lang = useB3Lang();
 
-  const { dispatch } = useContext(DynamicallyVariableedContext);
+  const { dispatch } = useContext(DynamicallyVariableContext);
   const role = useAppSelector(({ company }) => company.customer.role);
 
-  const { state: globalState } = useContext(GlobaledContext);
+  const { selectCompanyHierarchyId, isEnabledCompanyHierarchy } = useAppSelector(
+    ({ company }) => company.companyHierarchyInfo,
+  );
+
+  const { permissions } = useAppSelector(({ company }) => company);
+
+  const { state: globalState } = useContext(GlobalContext);
   const { quoteDetailHasNewMessages, registerEnabled } = globalState;
 
   const theme = useTheme();
@@ -72,17 +105,78 @@ export default function B3Nav({ closeSidebar }: B3NavProps) {
       closeSidebar(false);
     }
   };
-  const menuItems = () => {
-    const newRoutes = getAllowedRoutes(globalState).filter((route) => route.isMenuItem);
 
-    return newRoutes;
-  };
-  const newRoutes = menuItems();
+  useEffect(() => {
+    let isHasSubsidiariesCompanyPermission = false;
+    const { hash } = window.location;
+    const url = hash.split('#')[1] || '';
+    const routes = getAllowedRoutes(globalState).filter((route) => route.isMenuItem);
+
+    if (url) {
+      const routeItem = getAllowedRoutes(globalState).find((item) => {
+        return matchPath(item.path, url);
+      });
+
+      if (routeItem && routeItem?.subsidiariesCompanyKey) {
+        const { permissionCodes } = routeItem;
+
+        const code = permissionCodes?.includes(',')
+          ? permissionCodes.split(',')[0].trim()
+          : permissionCodes;
+
+        isHasSubsidiariesCompanyPermission = validatePermissionWithComparisonType({
+          code,
+          level: 3,
+        });
+      }
+    }
+
+    const subsidiariesPermission = getSubsidiariesPermission(routes);
+
+    store.dispatch(setPagesSubsidiariesPermission(subsidiariesPermission));
+
+    store.dispatch(
+      setCompanyHierarchyInfoModules({
+        isHasCurrentPagePermission: isHasSubsidiariesCompanyPermission,
+      }),
+    );
+  }, [selectCompanyHierarchyId, globalState, navigate]);
+
+  const newRoutes = useMemo(() => {
+    let routes = getAllowedRoutes(globalState).filter((route) => route.isMenuItem);
+
+    const subsidiariesPermission = getSubsidiariesPermission(routes);
+
+    if (selectCompanyHierarchyId) {
+      routes = routes.filter((route) =>
+        route?.subsidiariesCompanyKey
+          ? subsidiariesPermission[route.subsidiariesCompanyKey]
+          : false,
+      );
+    } else {
+      routes = routes.filter((route) => {
+        if (route?.subsidiariesCompanyKey === 'companyHierarchy') {
+          return isEnabledCompanyHierarchy && subsidiariesPermission[route.subsidiariesCompanyKey];
+        }
+        return true;
+      });
+    }
+
+    return routes;
+
+    // ignore permissions because verifyCompanyLevelPermissionByCode method with permissions
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectCompanyHierarchyId, permissions, globalState, isEnabledCompanyHierarchy]);
+
   const activePath = (path: string) => {
-    if (location.pathname === path) return true;
+    if (location.pathname === path) {
+      B3SStorage.set('prevPath', path);
+      return true;
+    }
 
     if (location.pathname.includes('orderDetail')) {
-      const gotoOrderPath = path === '/company-orders' ? '/company-orders' : '/orders';
+      const gotoOrderPath =
+        B3SStorage.get('prevPath') === '/company-orders' ? '/company-orders' : '/orders';
       if (path === gotoOrderPath) return true;
     }
 
@@ -102,7 +196,7 @@ export default function B3Nav({ closeSidebar }: B3NavProps) {
       sx={{
         width: '100%',
         maxWidth: 360,
-        bgcolor: `${isMobile ? 'background.paper' : 'background.default'}`,
+        bgcolor: isMobile ? 'background.paper' : 'background.default',
         color: primaryColor || 'info.main',
         '& .MuiListItem-root': {
           '& .MuiButtonBase-root.Mui-selected': {

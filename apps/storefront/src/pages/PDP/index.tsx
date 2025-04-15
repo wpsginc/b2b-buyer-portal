@@ -1,10 +1,9 @@
-import { lazy, useContext, useEffect, useState } from 'react';
+import { lazy, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import globalB3 from '@b3/global-b3';
-import { LangFormatFunction, useB3Lang } from '@b3/lang';
-import { Box, Button } from '@mui/material';
+import config from '@b3/global-b3';
+import { useB3Lang } from '@b3/lang';
 
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   addProductToBcShoppingList,
   addProductToShoppingList,
@@ -17,7 +16,10 @@ import { getProductOptionList, isAllRequiredOptionFilled } from '@/utils/b3AddTo
 import { getValidOptionsList } from '@/utils/b3Product/b3Product';
 
 import { conversionProductsList } from '../../utils/b3Product/shared/config';
-import { type PageProps } from '../PageProps';
+
+import { useAddedToShoppingListAlert } from './useAddedToShoppingListAlert';
+
+export { useAddedToShoppingListAlert } from './useAddedToShoppingListAlert';
 
 const CreateShoppingList = lazy(() => import('../OrderDetail/components/CreateShoppingList'));
 const OrderShoppingList = lazy(() => import('../OrderDetail/components/OrderShoppingList'));
@@ -26,49 +28,14 @@ interface AddProductsToShoppingListParams {
   isB2BUser: boolean;
   items: CustomFieldItems[];
   shoppingListId: number | string;
-  gotoShoppingDetail: (id: number | string) => void;
   customerGroupId?: number;
-  b3Lang: LangFormatFunction;
 }
-
-const tip = (
-  id: number | string,
-  gotoShoppingDetail: (id: number | string) => void,
-  b3Lang: LangFormatFunction,
-) => (
-  <Box
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-    }}
-  >
-    <Box
-      sx={{
-        mr: '15px',
-      }}
-    >
-      {b3Lang('pdp.notification.productsAdded')}
-    </Box>
-    <Button
-      onClick={() => gotoShoppingDetail(id)}
-      variant="text"
-      sx={{
-        color: '#ffffff',
-        padding: 0,
-      }}
-    >
-      {b3Lang('pdp.notification.viewShoppingList')}
-    </Button>
-  </Box>
-);
 
 export const addProductsToShoppingList = async ({
   isB2BUser,
   customerGroupId,
   items,
   shoppingListId,
-  gotoShoppingDetail,
-  b3Lang,
 }: AddProductsToShoppingListParams) => {
   const { currency_code: currencyCode } = getActiveCurrencyInfo();
   const { id: companyId } = store.getState().company.companyInfo;
@@ -89,10 +56,13 @@ export const addProductsToShoppingList = async ({
     const { allOptions: requiredOptions, variants } = productsInfo[index];
     const { productId, sku, variantId: vId, quantity, optionSelections } = items[index];
     // check if it's an specified product
-    const variantId = vId || variants.find((item: { sku: string }) => item.sku === sku)?.variant_id;
-    // get selected options by inputed data
-    const optionList = getProductOptionList(optionSelections);
-    // verify inputed data includes required data
+    const variantId =
+      vId ||
+      variants.find((item: { sku: string }) => item.sku === sku)?.variant_id ||
+      variants[0]?.variant_id;
+    // get selected options by inputted data
+    const optionList = !optionSelections ? [] : getProductOptionList(optionSelections);
+    // verify inputted data includes required data
     const { isValid, message } = isAllRequiredOptionFilled(requiredOptions, optionList);
 
     if (!isValid) {
@@ -120,53 +90,16 @@ export const addProductsToShoppingList = async ({
     shoppingListId,
     items: products,
   });
-  globalSnackbar.success('Products were added to your shopping list', {
-    jsx: () => tip(shoppingListId, gotoShoppingDetail, b3Lang),
-    isClose: true,
-  });
 };
 
-function PDP({ setOpenPage }: PageProps) {
-  const isPromission = true;
+function useData() {
   const {
     state: { shoppingListClickNode },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
   const customerGroupId = useAppSelector(({ company }) => company.customer.customerGroupId);
   const platform = useAppSelector(({ global }) => global.storeInfo.platform);
   const setOpenPageFn = useAppSelector(({ global }) => global.setOpenPageFn);
   const isB2BUser = useAppSelector(isB2BUserSelector);
-  const b3Lang = useB3Lang();
-
-  const [openShoppingList, setOpenShoppingList] = useState<boolean>(false);
-  const [isOpenCreateShopping, setIsOpenCreateShopping] = useState<boolean>(false);
-
-  const [isRequestLoading, setIsRequestLoading] = useState<boolean>(false);
-
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    setOpenShoppingList(true);
-  }, []);
-
-  const handleShoppingClose = () => {
-    setOpenShoppingList(false);
-    setIsOpenCreateShopping(false);
-    navigate('/');
-    setOpenPageFn?.({
-      isOpen: false,
-      openUrl: '',
-    });
-  };
-
-  const gotoShoppingDetail = (id: string | number) => {
-    setOpenPage({
-      isOpen: true,
-      openUrl: `/shoppingList/${id}`,
-      params: {
-        shoppingListBtn: 'add',
-      },
-    });
-  };
 
   const getShoppingListItem = () => {
     if (platform !== 'bigcommerce') {
@@ -179,7 +112,7 @@ function PDP({ setOpenPage }: PageProps) {
     if (!shoppingListClickNode) return undefined;
 
     const productView: HTMLElement | null = shoppingListClickNode.closest(
-      globalB3['dom.productView'],
+      config['dom.productView'],
     );
     if (!productView) return undefined;
 
@@ -188,11 +121,50 @@ function PDP({ setOpenPage }: PageProps) {
     const sku = (productView.querySelector('[data-product-sku]')?.innerHTML ?? '').trim();
     const form = productView.querySelector('form[data-cart-item-add]') as HTMLFormElement;
     return {
-      productId: +productId,
+      productId: Number(productId),
       sku,
-      quantity: +quantity,
+      quantity: Number(quantity),
       optionSelections: serialize(form),
     };
+  };
+
+  const addToShoppingList = ({
+    shoppingListId,
+    product,
+  }: {
+    shoppingListId: string | number;
+    product: CustomFieldItems;
+  }) =>
+    addProductsToShoppingList({
+      isB2BUser,
+      customerGroupId,
+      shoppingListId,
+      items: [product],
+    });
+
+  return { setOpenPageFn, getShoppingListItem, addToShoppingList };
+}
+
+function PDP() {
+  const { setOpenPageFn, getShoppingListItem, addToShoppingList } = useData();
+  const b3Lang = useB3Lang();
+
+  const [openShoppingList, setOpenShoppingList] = useState<boolean>(true);
+  const [isOpenCreateShopping, setIsOpenCreateShopping] = useState<boolean>(false);
+
+  const [isRequestLoading, setIsRequestLoading] = useState<boolean>(false);
+  const displayAddedToShoppingListAlert = useAddedToShoppingListAlert();
+
+  const navigate = useNavigate();
+
+  const handleShoppingClose = () => {
+    setOpenShoppingList(false);
+    setIsOpenCreateShopping(false);
+    navigate('/');
+    setOpenPageFn?.({
+      isOpen: false,
+      openUrl: '',
+    });
   };
 
   const handleShoppingConfirm = async (shoppingListId: string) => {
@@ -201,14 +173,9 @@ function PDP({ setOpenPage }: PageProps) {
     if (!product) return;
     try {
       setIsRequestLoading(true);
-      await addProductsToShoppingList({
-        isB2BUser,
-        customerGroupId,
-        shoppingListId,
-        items: [product],
-        gotoShoppingDetail,
-        b3Lang,
-      });
+      await addToShoppingList({ shoppingListId, product }).then(() =>
+        displayAddedToShoppingListAlert(shoppingListId),
+      );
 
       handleShoppingClose();
     } finally {
@@ -232,24 +199,20 @@ function PDP({ setOpenPage }: PageProps) {
 
   return (
     <>
-      {isPromission && (
-        <OrderShoppingList
-          isOpen={openShoppingList}
-          dialogTitle={b3Lang('pdp.addToShoppingList')}
-          onClose={handleShoppingClose}
-          onConfirm={handleShoppingConfirm}
-          onCreate={handleOpenCreateDialog}
-          isLoading={isRequestLoading}
-          setLoading={setIsRequestLoading}
-        />
-      )}
-      {isPromission && (
-        <CreateShoppingList
-          open={isOpenCreateShopping}
-          onChange={handleCreateShoppingClick}
-          onClose={handleCloseShoppingClick}
-        />
-      )}
+      <OrderShoppingList
+        isOpen={openShoppingList}
+        dialogTitle={b3Lang('pdp.addToShoppingList')}
+        onClose={handleShoppingClose}
+        onConfirm={handleShoppingConfirm}
+        onCreate={handleOpenCreateDialog}
+        isLoading={isRequestLoading}
+        setLoading={setIsRequestLoading}
+      />
+      <CreateShoppingList
+        open={isOpenCreateShopping}
+        onChange={handleCreateShoppingClick}
+        onClose={handleCloseShoppingClick}
+      />
     </>
   );
 }

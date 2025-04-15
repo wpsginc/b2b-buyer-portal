@@ -13,6 +13,7 @@ import {
   updateBcShoppingList,
 } from '@/shared/service/b2b';
 import { rolePermissionSelector, useAppSelector } from '@/store';
+import { ShoppingListStatus } from '@/types/shoppingList';
 import { channelId, snackbar } from '@/utils';
 
 import {
@@ -31,6 +32,9 @@ function AddEditShoppingLists(
   ref: Ref<unknown> | undefined,
 ) {
   const b2bPermissions = useAppSelector(rolePermissionSelector);
+  const { selectCompanyHierarchyId } = useAppSelector(
+    ({ company }) => company.companyHierarchyInfo,
+  );
   const [open, setOpen] = useState<boolean>(false);
   const [type, setType] = useState<string>('');
 
@@ -96,7 +100,12 @@ function AddEditShoppingLists(
         } else if (type === 'add') {
           if (isB2BUser) {
             const { submitShoppingListPermission } = b2bPermissions;
-            params.status = submitShoppingListPermission ? 30 : 0;
+            if (selectCompanyHierarchyId) {
+              params.companyId = Number(selectCompanyHierarchyId);
+            }
+            params.status = submitShoppingListPermission
+              ? ShoppingListStatus.Draft
+              : ShoppingListStatus.Approved;
           } else {
             params.channelId = channelId;
           }

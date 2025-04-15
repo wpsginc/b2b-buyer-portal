@@ -1,24 +1,29 @@
-import { ReactElement, useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
 import { Box, Button, InputAdornment, TextField, Typography } from '@mui/material';
 import cloneDeep from 'lodash-es/cloneDeep';
 
+import { B2BAutoCompleteCheckbox } from '@/components';
 import B3Spin from '@/components/spin/B3Spin';
-import { B3PaginationTable } from '@/components/table/B3PaginationTable';
+import { B3PaginationTable, GetRequestList } from '@/components/table/B3PaginationTable';
 import { TableColumnItem } from '@/components/table/B3Table';
+import { permissionLevels } from '@/constants';
 import { useMobile, useSort } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import { exportInvoicesAsCSV, getInvoiceList, getInvoiceStats } from '@/shared/service/b2b';
 import { rolePermissionSelector, useAppSelector } from '@/store';
+import { CustomerRole } from '@/types';
 import { InvoiceList, InvoiceListNode } from '@/types/invoice';
 import {
+  b2bPermissionsMap,
   currencyFormat,
   currencyFormatInfo,
   displayFormat,
   getUTCTimestamp,
   handleGetCorrespondingCurrencyToken,
   snackbar,
+  validatePermissionWithComparisonType,
 } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 
@@ -37,12 +42,16 @@ import InvoiceListType, {
   filterFormConfigsTranslationVariables,
   sortIdArr,
 } from './utils/config';
+import { formattingNumericValues } from './utils/payment';
 import { handlePrintPDF } from './utils/pdf';
 import { InvoiceItemCard } from './InvoiceItemCard';
 
 export interface FilterSearchProps {
-  [key: string]: string | number | null;
+  [key: string]: string | number | number[] | null;
   q: string;
+  startValue: number | string;
+  endValue: number | string;
+  companyIds: number[];
 }
 
 interface PaginationTableRefProps extends HTMLInputElement {
@@ -58,15 +67,54 @@ const initFilter = {
   first: 10,
   offset: 0,
   orderBy: `-${sortIdArr[defaultSortKey]}`,
+  companyIds: [],
 };
+
+function useData() {
+  const role = useAppSelector(({ company }) => company.customer.role);
+  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
+
+  const companyInfoId = useAppSelector(({ company }) => company.companyInfo.id);
+  const { selectCompanyHierarchyId, isEnabledCompanyHierarchy } = useAppSelector(
+    ({ company }) => company.companyHierarchyInfo,
+  );
+  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
+
+  const { invoicePayPermission, purchasabilityPermission } = useAppSelector(rolePermissionSelector);
+  const currentCompanyId =
+    role === CustomerRole.SUPER_ADMIN && isAgenting
+      ? Number(salesRepCompanyId)
+      : Number(companyInfoId);
+
+  const { invoice: invoiceSubViewPermission } = useAppSelector(
+    ({ company }) => company.pagesSubsidiariesPermission,
+  );
+
+  return {
+    isAgenting,
+    selectCompanyHierarchyId,
+    isEnabledCompanyHierarchy,
+    invoicePayPermission,
+    purchasabilityPermission,
+    currentCompanyId,
+    invoiceSubViewPermission,
+  };
+}
 
 function Invoice() {
   const currentDate = new Date().getTime();
   const b3Lang = useB3Lang();
-  const role = useAppSelector(({ company }) => company.customer.role);
-  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
 
-  const { invoicePayPermission, purchasabilityPermission } = useAppSelector(rolePermissionSelector);
+  const {
+    isAgenting,
+    selectCompanyHierarchyId,
+    isEnabledCompanyHierarchy,
+    invoicePayPermission,
+    purchasabilityPermission,
+    currentCompanyId,
+    invoiceSubViewPermission,
+  } = useData();
+
   const navigate = useNavigate();
   const [isMobile] = useMobile();
   const paginationTableRef = useRef<PaginationTableRefProps | null>(null);
@@ -74,7 +122,7 @@ function Invoice() {
   const { decimal_places: decimalPlaces = 2 } = currencyFormatInfo();
 
   const [isRequestLoading, setIsRequestLoading] = useState<boolean>(false);
-  const [isOpenHistorys, setIsOpenHistorys] = useState<boolean>(false);
+  const [isOpenHistory, setIsOpenHistory] = useState<boolean>(false);
   const [currentInvoiceId, setCurrentInvoiceId] = useState<string>('');
   const [receiptId, setReceiptId] = useState<string>('');
   const [type, setType] = useState<string>('');
@@ -84,16 +132,22 @@ function Invoice() {
   const [selectedPay, setSelectedPay] = useState<CustomFieldItems | InvoiceListNode[]>([]);
   const [list, setList] = useState<InvoiceListNode[]>([]);
 
-  const [filterData, setFilterData] = useState<Partial<FilterSearchProps> | null>();
+  const [filterData, setFilterData] = useState<Partial<FilterSearchProps>>({});
 
   const [exportCsvText, setExportCsvText] = useState<string>(b3Lang('invoice.exportCsvText'));
 
   const [filterChangeFlag, setFilterChangeFlag] = useState(false);
   const [filterLists, setFilterLists] = useState<InvoiceListNode[]>([]);
+  const [selectAllPay, setSelectAllPay] = useState<boolean>(invoicePayPermission);
+
+  const invoiceSubPayPermission = validatePermissionWithComparisonType({
+    level: permissionLevels.COMPANY_SUBSIDIARIES,
+    code: b2bPermissionsMap.invoicePayPermission,
+  });
 
   const {
     state: { bcLanguage },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const [handleSetOrderBy, order, orderBy] = useSort(
     sortIdArr,
@@ -138,12 +192,16 @@ function Invoice() {
   const handleStatisticsInvoiceAmount = async () => {
     try {
       setIsRequestLoading(true);
-      const { invoiceStats } = await getInvoiceStats(filterData?.status ? +filterData.status : 0);
+      const { invoiceStats } = await getInvoiceStats(
+        filterData?.status ? Number(filterData.status) : 0,
+        Number(decimalPlaces),
+        filterData?.companyIds || [],
+      );
 
       if (invoiceStats) {
         const { overDueBalance, totalBalance } = invoiceStats;
-        setUnpaidAmount(+totalBalance.toFixed(decimalPlaces));
-        setOverdueAmount(+overDueBalance.toFixed(decimalPlaces));
+        setUnpaidAmount(Number(formattingNumericValues(Number(totalBalance), decimalPlaces)));
+        setOverdueAmount(Number(formattingNumericValues(Number(overDueBalance), decimalPlaces)));
       }
     } catch (err) {
       b2bLogger.error(err);
@@ -198,22 +256,33 @@ function Invoice() {
         const newItems = productList.find((product: InvoiceListNode) => {
           const { node } = product;
 
-          return +node.id === +item;
+          return Number(node.id) === Number(item);
         });
 
         return newItems;
       });
 
-      setCheckedArr([...checkedItems]);
+      const newEnableItems = checkedItems.filter(
+        (item: InvoiceListNode | undefined) => item && !item.node.disableCurrentCheckbox,
+      );
+      setCheckedArr([...newEnableItems]);
     } else {
       setCheckedArr([]);
     }
   };
 
-  const handleViewInvoice = async (id: string, status: string | number) => {
+  const handleViewInvoice = async (
+    id: string,
+    status: string | number,
+    invoiceCompanyId: string,
+  ) => {
     try {
+      const invoicePay =
+        Number(invoiceCompanyId) === Number(currentCompanyId)
+          ? invoicePayPermission
+          : invoiceSubPayPermission;
       setIsRequestLoading(true);
-      const isPayNow = purchasabilityPermission && invoicePayPermission && status !== 2;
+      const isPayNow = purchasabilityPermission && invoicePay && status !== 2;
       const pdfUrl = await handlePrintPDF(id, isPayNow);
 
       if (!pdfUrl) {
@@ -240,7 +309,7 @@ function Invoice() {
         node: { id },
       } = invoice;
 
-      return +id === +invoiceId;
+      return Number(id) === Number(invoiceId);
     });
 
     if (selectedPay.length > 0) {
@@ -252,9 +321,11 @@ function Invoice() {
           node: { openBalance: currentOriginOpenBalance },
         } = currentOriginInvoice;
 
-        if (+id === +invoiceId) {
+        if (Number(id) === Number(invoiceId)) {
           openBalance.value =
-            +currentOriginOpenBalance.value < +newPrice ? currentOriginOpenBalance.value : newPrice;
+            Number(currentOriginOpenBalance.value) < Number(newPrice)
+              ? currentOriginOpenBalance.value
+              : newPrice;
         }
 
         return selectedItem;
@@ -275,7 +346,7 @@ function Invoice() {
         : checkedArr;
 
       const invoiceNumber = currentCheckedArr.map((item: InvoiceListNode) => item.node.id);
-      const invoiceStatus = filterData?.status ? [+filterData.status] : [];
+      const invoiceStatus = filterData?.status ? [Number(filterData.status)] : [];
 
       let orderByFiled = '-invoice_number';
       if (filterData?.orderBy) {
@@ -293,6 +364,7 @@ function Invoice() {
         endDateAt: filterData?.endDateAt || null,
         status: invoiceStatus,
         orderBy: orderByFiled,
+        companyIds: filterData?.companyIds || [],
       };
 
       const { invoicesExport } = await exportInvoicesAsCSV({
@@ -311,6 +383,10 @@ function Invoice() {
   };
 
   useEffect(() => {
+    const newInitFilter = {
+      ...initFilter,
+      companyIds: [Number(selectCompanyHierarchyId) || Number(currentCompanyId)],
+    };
     if (location?.search) {
       const params = new URLSearchParams(location.search);
       const getInvoiceId = params.get('invoiceId') || '';
@@ -318,7 +394,7 @@ function Invoice() {
 
       if (getInvoiceId) {
         setFilterData({
-          ...initFilter,
+          ...newInitFilter,
           q: getInvoiceId,
         });
         setType(InvoiceListType.DETAIL);
@@ -328,17 +404,32 @@ function Invoice() {
         // open Successful page
         setType(InvoiceListType.CHECKOUT);
         setFilterData({
-          ...initFilter,
+          ...newInitFilter,
         });
         setReceiptId(getReceiptId);
       }
     } else {
       setType(InvoiceListType.NORMAL);
       setFilterData({
-        ...initFilter,
+        ...newInitFilter,
       });
     }
-  }, [location]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location, selectCompanyHierarchyId]);
+
+  const handleSelectCompanies = (company: number[]) => {
+    const newCompanyIds = company.includes(-1) ? [] : company;
+    setFilterData({
+      ...filterData,
+      companyIds: newCompanyIds,
+    });
+
+    setSelectAllPay(
+      company.includes(currentCompanyId) || company.includes(-1)
+        ? invoicePayPermission
+        : invoiceSubPayPermission,
+    );
+  };
 
   useEffect(() => {
     const selectedInvoice =
@@ -347,7 +438,7 @@ function Invoice() {
           node: { openBalance },
         } = item;
 
-        return +openBalance.value !== 0;
+        return Number(openBalance.value) !== 0;
       }) || [];
 
     if (selectedInvoice.length > 0) {
@@ -364,7 +455,7 @@ function Invoice() {
               node: { id: selectedId },
             } = item;
 
-            return +id === +selectedId;
+            return Number(id) === Number(selectedId);
           });
 
           if (currentSelectedItem) {
@@ -387,7 +478,7 @@ function Invoice() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkedArr]);
 
-  const fetchList = async (params: Partial<FilterSearchProps>) => {
+  const fetchList: GetRequestList<Partial<FilterSearchProps>, InvoiceList> = async (params) => {
     const {
       invoices: { edges, totalCount },
     } = await getInvoiceList(params);
@@ -408,7 +499,16 @@ function Invoice() {
       const item = invoiceNode;
       item.node.disableCurrentCheckbox = false;
 
-      openBalance.value = (+openBalance.value).toFixed(decimalPlaces);
+      openBalance.originValue = `${Number(openBalance.value)}`;
+      openBalance.value = formattingNumericValues(Number(openBalance.value), decimalPlaces);
+
+      item.node.disableCurrentCheckbox = Number(openBalance.value) === 0;
+
+      const { companyInfo } = item.node;
+      if (Number(companyInfo.companyId) !== Number(currentCompanyId)) {
+        item.node.disableCurrentCheckbox =
+          !invoiceSubPayPermission || Number(openBalance.value) === 0;
+      }
     });
     setList(invoicesList);
     handleStatisticsInvoiceAmount();
@@ -429,15 +529,20 @@ function Invoice() {
     let result = val;
     if (val.includes('.')) {
       const wholeDecimalNumber = val.split('.');
-      const movePoint = wholeDecimalNumber[1].length - +decimalPlaces;
+      const movePoint =
+        decimalPlaces === 0 ? 0 : wholeDecimalNumber[1].length - Number(decimalPlaces);
       if (wholeDecimalNumber[1] && movePoint > 0) {
         const newVal = wholeDecimalNumber[0] + wholeDecimalNumber[1];
         result = `${newVal.slice(0, -decimalPlaces)}.${newVal.slice(-decimalPlaces)}`;
       }
+      if (wholeDecimalNumber[1] && movePoint === 0) {
+        result = formattingNumericValues(Number(val), decimalPlaces);
+      }
     } else if (result.length > 1) {
       result = `${val.slice(0, 1)}.${val.slice(-1)}`;
+      if (Number(decimalPlaces) === 0) result = val;
     } else {
-      result = `${val}`;
+      result = val;
     }
 
     handleSetSelectedInvoiceAccount(result, id);
@@ -458,13 +563,25 @@ function Invoice() {
             },
           }}
           onClick={() => {
-            handleViewInvoice(item.id, item.status);
+            const companyInfo = item?.companyInfo || {};
+            handleViewInvoice(item.id, item.status, companyInfo?.companyId);
           }}
         >
           {item?.invoiceNumber ? item?.invoiceNumber : item?.id}
         </Box>
       ),
       width: '8%',
+    },
+    {
+      key: 'companyInfo',
+      title: b3Lang('invoice.headers.companyName'),
+      isSortable: false,
+      render: (item: InvoiceList) => {
+        const { companyName } = item?.companyInfo || {};
+
+        return <Box>{companyName}</Box>;
+      },
+      width: '15%',
     },
     {
       key: 'orderNumber',
@@ -486,14 +603,15 @@ function Invoice() {
           {item?.orderNumber || '-'}
         </Box>
       ),
-      width: '8%',
+      width: '12%',
     },
     {
       key: 'createdAt',
       title: b3Lang('invoice.headers.invoiceDate'),
       isSortable: true,
-      render: (item: InvoiceList) => `${item.createdAt ? displayFormat(+item.createdAt) : '–'}`,
-      width: '10%',
+      render: (item: InvoiceList) =>
+        `${item.createdAt ? displayFormat(Number(item.createdAt)) : '–'}`,
+      width: '15%',
     },
     {
       key: 'updatedAt',
@@ -510,11 +628,11 @@ function Invoice() {
               fontSize: '14px',
             }}
           >
-            {`${item.dueDate ? displayFormat(+item.dueDate) : '–'}`}
+            {`${item.dueDate ? displayFormat(Number(item.dueDate)) : '–'}`}
           </Typography>
         );
       },
-      width: '10%',
+      width: '15%',
     },
     {
       key: 'originalBalance',
@@ -522,7 +640,10 @@ function Invoice() {
       isSortable: true,
       render: (item: InvoiceList) => {
         const { originalBalance } = item;
-        const originalAmount = (+originalBalance.value).toFixed(decimalPlaces);
+        const originalAmount = formattingNumericValues(
+          Number(originalBalance.value),
+          decimalPlaces,
+        );
 
         const token = handleGetCorrespondingCurrencyToken(originalBalance.code);
 
@@ -537,7 +658,7 @@ function Invoice() {
       render: (item: InvoiceList) => {
         const { openBalance } = item;
 
-        const openAmount = (+openBalance.value).toFixed(decimalPlaces);
+        const openAmount = formattingNumericValues(Number(openBalance.value), decimalPlaces);
         const token = handleGetCorrespondingCurrencyToken(openBalance.code);
 
         return `${token}${openAmount || 0}`;
@@ -559,7 +680,7 @@ function Invoice() {
               node: { id: selectedId },
             } = item;
 
-            return +selectedId === +id;
+            return Number(selectedId) === Number(id);
           });
 
           if (currentSelected) {
@@ -570,7 +691,7 @@ function Invoice() {
             disabled = false;
             valuePrice = selectedOpenBalance.value;
 
-            if (+openBalance.value === 0) {
+            if (Number(openBalance.value) === 0) {
               disabled = true;
             }
           }
@@ -631,7 +752,7 @@ function Invoice() {
       key: 'companyName',
       title: b3Lang('invoice.headers.action'),
       render: (row: InvoiceList) => {
-        const { id } = row;
+        const { id, companyInfo } = row;
         let actionRow = row;
         if (selectedPay.length > 0) {
           const currentSelected = selectedPay.find((item: InvoiceListNode) => {
@@ -639,7 +760,7 @@ function Invoice() {
               node: { id: selectedId },
             } = item;
 
-            return +selectedId === +id;
+            return Number(selectedId) === Number(id);
           });
 
           if (currentSelected) {
@@ -651,8 +772,14 @@ function Invoice() {
           <B3Pulldown
             row={actionRow}
             setInvoiceId={setCurrentInvoiceId}
-            handleOpenHistoryModal={setIsOpenHistorys}
+            handleOpenHistoryModal={setIsOpenHistory}
             setIsRequestLoading={setIsRequestLoading}
+            isCurrentCompany={Number(currentCompanyId) === Number(companyInfo.companyId)}
+            invoicePay={
+              Number(currentCompanyId) === Number(companyInfo.companyId)
+                ? invoicePayPermission
+                : invoiceSubPayPermission
+            }
           />
         );
       },
@@ -707,6 +834,7 @@ function Invoice() {
     <B3Spin isSpinning={isRequestLoading}>
       <Box
         sx={{
+          overflowX: 'auto',
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
@@ -721,26 +849,56 @@ function Invoice() {
             flexDirection: isMobile ? 'column' : 'row',
           }}
         >
-          <B3Filter
-            fiterMoreInfo={translatedFilterFormConfigs}
-            handleChange={handleChange}
-            handleFilterChange={handleFilterChange}
-            startPicker={{
-              isEnabled: true,
-              label: b3Lang('invoice.filter.from'),
-              defaultValue:
-                typeof filterData?.beginDateAt === 'number' ? +filterData.beginDateAt * 1000 : '',
-              pickerKey: 'start',
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              width: isMobile ? '100%' : 'auto',
+
+              '& > div': {
+                width: isMobile ? '100%' : 'auto',
+              },
             }}
-            endPicker={{
-              isEnabled: true,
-              label: b3Lang('invoice.filter.to'),
-              defaultValue:
-                typeof filterData?.endDateAt === 'number' ? +filterData.endDateAt * 1000 : '',
-              pickerKey: 'end',
-            }}
-            searchValue={filterData?.q || ''}
-          />
+          >
+            {isEnabledCompanyHierarchy && invoiceSubViewPermission && (
+              <Box
+                sx={{
+                  mr: isMobile ? 0 : '10px',
+                  mb: '30px',
+                }}
+              >
+                <B2BAutoCompleteCheckbox handleChangeCompanyIds={handleSelectCompanies} />
+              </Box>
+            )}
+            <B3Filter
+              filterMoreInfo={translatedFilterFormConfigs}
+              handleChange={handleChange}
+              handleFilterChange={handleFilterChange}
+              startPicker={{
+                isEnabled: true,
+                label: b3Lang('invoice.filter.from'),
+                defaultValue:
+                  typeof filterData?.beginDateAt === 'number'
+                    ? Number(filterData.beginDateAt) * 1000
+                    : '',
+                pickerKey: 'start',
+              }}
+              endPicker={{
+                isEnabled: true,
+                label: b3Lang('invoice.filter.to'),
+                defaultValue:
+                  typeof filterData?.endDateAt === 'number'
+                    ? Number(filterData.endDateAt) * 1000
+                    : '',
+                pickerKey: 'end',
+              }}
+              searchValue={filterData?.q || ''}
+              pcContainerWidth="36rem"
+              pcSearchContainerWidth="80%"
+            />
+          </Box>
           <Box
             sx={{
               display: 'flex',
@@ -789,8 +947,8 @@ function Invoice() {
           isCustomRender={false}
           requestLoading={setIsRequestLoading}
           tableKey="id"
-          showCheckbox={invoicePayPermission && purchasabilityPermission}
-          showSelectAllCheckbox={!isMobile && invoicePayPermission && purchasabilityPermission}
+          showCheckbox={selectAllPay && purchasabilityPermission}
+          showSelectAllCheckbox={!isMobile && selectAllPay && purchasabilityPermission}
           disableCheckbox={false}
           applyAllDisableCheckbox={false}
           getSelectCheckbox={getSelectCheckbox}
@@ -800,11 +958,8 @@ function Invoice() {
           sortByFn={handleSetOrderBy}
           isSelectOtherPageCheckbox
           hover
-          renderItem={(
-            row: InvoiceList,
-            index?: number,
-            checkBox?: (disable?: boolean) => ReactElement,
-          ) => (
+          isAutoRefresh={false}
+          renderItem={(row, index, checkBox) => (
             <InvoiceItemCard
               item={row}
               checkBox={checkBox}
@@ -812,10 +967,16 @@ function Invoice() {
               handleViewInvoice={handleViewInvoice}
               setIsRequestLoading={setIsRequestLoading}
               setInvoiceId={setCurrentInvoiceId}
-              handleOpenHistoryModal={setIsOpenHistorys}
+              handleOpenHistoryModal={setIsOpenHistory}
               selectedPay={selectedPay}
               handleGetCorrespondingCurrency={handleGetCorrespondingCurrencyToken}
               addBottom={list.length - 1 === index}
+              isCurrentCompany={Number(currentCompanyId) === Number(row.companyInfo.companyId)}
+              invoicePay={
+                Number(currentCompanyId) === Number(row.companyInfo.companyId)
+                  ? invoicePayPermission
+                  : invoiceSubPayPermission
+              }
             />
           )}
         />
@@ -833,15 +994,15 @@ function Invoice() {
           </Box>
         )}
       </Box>
-      {selectedPay.length > 0 && (role === 0 || isAgenting) && (
-        <InvoiceFooter selectedPay={selectedPay} decimalPlaces={decimalPlaces} />
-      )}
+      {selectedPay.length > 0 &&
+        (((invoicePayPermission || invoiceSubPayPermission) && purchasabilityPermission) ||
+          isAgenting) && <InvoiceFooter selectedPay={selectedPay} decimalPlaces={decimalPlaces} />}
       <PaymentsHistory
-        open={isOpenHistorys}
+        open={isOpenHistory}
         currentInvoiceId={currentInvoiceId}
-        setOpen={setIsOpenHistorys}
+        setOpen={setIsOpenHistory}
       />
-      <PaymentSuccess receiptId={+receiptId} type={type} />
+      <PaymentSuccess receiptId={Number(receiptId)} type={type} />
     </B3Spin>
   );
 }

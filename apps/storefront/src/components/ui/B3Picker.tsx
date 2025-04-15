@@ -5,8 +5,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
 
-import { useMobile } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 
 import setDayjsLocale from './setDayjsLocale';
 
@@ -29,21 +28,20 @@ export default function B3Picker({
   formatInput = 'YYYY-MM-DD',
   size = 'small',
 }: B3PickerProps) {
-  const pickerRef = useRef(null);
+  const pickerRef = useRef<HTMLInputElement | null>(null);
   const container = useRef<HTMLInputElement | null>(null);
-  const [isMobile] = useMobile();
 
   const {
     state: { bcLanguage },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const activeLang = setDayjsLocale(bcLanguage || 'en');
 
   const [open, setOpen] = useState(false);
   const openPickerClick = () => {
     setOpen(!open);
-    if (pickerRef && pickerRef?.current && (pickerRef.current as any)?.blur) {
-      (pickerRef.current as any).blur();
+    if (pickerRef?.current?.blur) {
+      pickerRef.current.blur();
     }
   };
 
@@ -76,17 +74,8 @@ export default function B3Picker({
             <TextField
               {...params}
               size={size}
-              onClick={() => {
-                if (!isMobile) {
-                  openPickerClick();
-                }
-              }}
-              onTouchEnd={() => {
-                if (isMobile) {
-                  if (!open) {
-                    openPickerClick();
-                  }
-                }
+              onMouseDown={() => {
+                openPickerClick();
               }}
               variant={variant}
             />

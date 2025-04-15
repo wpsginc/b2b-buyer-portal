@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { Dispatch, SetStateAction } from 'react';
 
+import { LOGIN_LANDING_LOCATIONS } from '@/constants';
 import { OpenPageState } from '@/types/hooks';
 
 export interface TaxZoneRates {
@@ -52,7 +53,14 @@ interface GlobalBlockPendingQuoteNonPurchasableOOS {
   isEnableRequest?: boolean;
 }
 
-export interface GlabolState {
+interface QuoteSubmissionResponseProps {
+  value: string;
+  key: string;
+  message: string;
+  title: string;
+}
+
+export interface GlobalState {
   taxZoneRates: TaxZoneRatesProps[];
   isClickEnterBtn: boolean;
   currentClickedUrl: string;
@@ -67,9 +75,11 @@ export interface GlabolState {
   loginLandingLocation: string;
   recordOpenHash: string;
   blockPendingQuoteNonPurchasableOOS: GlobalBlockPendingQuoteNonPurchasableOOS;
+  quoteSubmissionResponse: QuoteSubmissionResponseProps;
+  isOpenCompanyHierarchyDropDown: boolean;
 }
 
-const initialState: GlabolState = {
+const initialState: GlobalState = {
   taxZoneRates: [],
   isClickEnterBtn: false,
   currentClickedUrl: '',
@@ -101,19 +111,26 @@ const initialState: GlabolState = {
     isEnableProduct: false,
     isEnableRequest: false,
   },
-  loginLandingLocation: '0',
+  loginLandingLocation: LOGIN_LANDING_LOCATIONS.BUYER_PORTAL,
   recordOpenHash: '',
+  quoteSubmissionResponse: {
+    value: '0',
+    key: 'quote_submission_response',
+    message: '',
+    title: '',
+  },
+  isOpenCompanyHierarchyDropDown: false,
 };
 
-export const glabolSlice = createSlice({
+export const globalSlice = createSlice({
   name: 'global',
   initialState,
   reducers: {
-    clearglabol: () => initialState,
+    clearGlobal: () => initialState,
     setTaxZoneRates: (state, { payload }: PayloadAction<TaxZoneRatesProps[]>) => {
       state.taxZoneRates = payload;
     },
-    setGlabolCommonState: (state, { payload }: PayloadAction<Partial<GlabolState>>) => ({
+    setGlobalCommonState: (state, { payload }: PayloadAction<Partial<GlobalState>>) => ({
       ...state,
       ...payload,
     }),
@@ -147,13 +164,22 @@ export const glabolSlice = createSlice({
     setStoreInfo: (state, { payload }: PayloadAction<StoreInfoProps>) => {
       state.storeInfo = payload;
     },
+    setQuoteSubmissionResponse: (
+      state,
+      { payload }: PayloadAction<QuoteSubmissionResponseProps>,
+    ) => {
+      state.quoteSubmissionResponse = payload;
+    },
+    setOpenCompanyHierarchyDropDown: (state, { payload }: PayloadAction<boolean>) => {
+      state.isOpenCompanyHierarchyDropDown = payload;
+    },
   },
 });
 
 export const {
-  clearglabol,
+  clearGlobal,
   setTaxZoneRates,
-  setGlabolCommonState,
+  setGlobalCommonState,
   setOpenPageReducer,
   setShowInclusiveTaxPrice,
   setBlockPendingAccountViewPrice,
@@ -161,6 +187,8 @@ export const {
   setCartNumber,
   setStoreInfo,
   setLoginLandingLocation,
-} = glabolSlice.actions;
+  setQuoteSubmissionResponse,
+  setOpenCompanyHierarchyDropDown,
+} = globalSlice.actions;
 
-export default glabolSlice.reducer;
+export default globalSlice.reducer;

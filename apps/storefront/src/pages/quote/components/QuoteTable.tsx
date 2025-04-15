@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useB3Lang } from '@b3/lang';
 import { Delete, Edit } from '@mui/icons-material';
+import WarningIcon from '@mui/icons-material/Warning';
 import { Box, styled, TextField, Typography } from '@mui/material';
 import ceil from 'lodash-es/ceil';
 
@@ -10,8 +11,8 @@ import { PRODUCT_DEFAULT_IMAGE } from '@/constants';
 import {
   deleteProductFromDraftQuoteList,
   setDraftProduct,
-  setDraftProductQuantity,
   useAppDispatch,
+  useAppSelector,
 } from '@/store';
 import { Product } from '@/types';
 import { QuoteItem } from '@/types/quotes';
@@ -20,6 +21,7 @@ import {
   calculateProductListPrice,
   getBCPrice,
   getDisplayPrice,
+  getVariantInfoOOSAndPurchase,
   setModifierQtyPrice,
 } from '@/utils/b3Product/b3Product';
 import { getProductOptionsFields } from '@/utils/b3Product/shared/config';
@@ -81,22 +83,33 @@ function QuoteTable(props: ShoppingDetailTableProps) {
   const [optionsProduct, setOptionsProduct] = useState<any>(null);
   const [optionsProductId, setOptionsProductId] = useState<string>('');
 
-  const handleUpdateProductQty = async (row: any, value: number | string) => {
-    const product = await setModifierQtyPrice(row, +value);
+  const isEnableProduct = useAppSelector(
+    ({ global }) => global.blockPendingQuoteNonPurchasableOOS.isEnableProduct,
+  );
 
-    dispatch(setDraftProductQuantity({ id: product.id, quantity: product.quantity }));
+  const handleUpdateProductQty = async (row: any, value: number | string) => {
+    const product = await setModifierQtyPrice(row, Number(value));
+
+    dispatch(
+      setDraftProduct({
+        id: product.id,
+        product: {
+          node: product,
+        },
+      }),
+    );
     updateSummary();
   };
 
   const handleCheckProductQty = async (row: any, value: number | string) => {
-    let newQty = ceil(+value);
-    if (newQty === +value && newQty >= 1 && newQty <= QUOTE_PRODUCT_QTY_MAX) return;
+    let newQty = ceil(Number(value));
+    if (newQty === Number(value) && newQty >= 1 && newQty <= QUOTE_PRODUCT_QTY_MAX) return;
 
-    if (+value < 1) {
+    if (Number(value) < 1) {
       newQty = 1;
     }
 
-    if (+value > QUOTE_PRODUCT_QTY_MAX) {
+    if (Number(value) > QUOTE_PRODUCT_QTY_MAX) {
       newQty = QUOTE_PRODUCT_QTY_MAX;
     }
 
@@ -149,16 +162,12 @@ function QuoteTable(props: ShoppingDetailTableProps) {
       }
 
       const taxExclusive = variantInfo!.bc_calculated_price?.tax_exclusive || 0;
-      const taxInclusive = variantInfo!.bc_calculated_price?.tax_inclusive || 0;
-
       const basePriceExclusiveTax = basePrice || taxExclusive;
-
-      const tax = taxPrice || +taxInclusive - +taxExclusive;
 
       return {
         node: {
           basePrice: basePriceExclusiveTax,
-          taxPrice: tax,
+          taxPrice,
           optionList: selectOptions,
           id: id.toString(),
           primaryImage,
@@ -168,7 +177,7 @@ function QuoteTable(props: ShoppingDetailTableProps) {
             ...product,
             selectOptions,
           },
-          quantity: +quantity,
+          quantity: Number(quantity),
           variantSku,
           calculatedTaxPrice,
           calculatedNoTaxPrice,
@@ -182,18 +191,8 @@ function QuoteTable(props: ShoppingDetailTableProps) {
     const newProducts = getNewQuoteProduct(products);
 
     newProducts.forEach((product) => {
-      const {
-        variantSku,
-        productsSearch: { variants },
-        basePrice,
-      } = product.node;
+      const { basePrice } = product.node;
       const newProduct = product;
-      const variantItem = variants?.find((item) => item.sku === variantSku);
-      if (variantItem) {
-        newProduct.node.taxPrice =
-          variantItem.bc_calculated_price.tax_inclusive -
-          variantItem.bc_calculated_price.tax_exclusive;
-      }
       newProduct.node.id = optionsProductId;
 
       newProduct.node.basePrice = basePrice;
@@ -220,6 +219,18 @@ function QuoteTable(props: ShoppingDetailTableProps) {
 
         const optionList = JSON.parse(row.optionList);
         const optionsValue: CustomFieldItems[] = productFields.filter((item) => item.valueText);
+        const currentProduct = getVariantInfoOOSAndPurchase(row);
+        const inventoryTracking =
+          row?.productsSearch?.inventoryTracking || row?.inventoryTracking || 'none';
+
+        let inventoryLevel = row?.productsSearch?.inventoryLevel || row?.inventoryLevel || 0;
+        if (inventoryTracking === 'variant') {
+          const currentVariant = row?.productsSearch?.variants.find(
+            (variant: CustomFieldItems) => variant.sku === row.variantSku,
+          );
+
+          inventoryLevel = currentVariant?.inventory_level;
+        }
 
         return (
           <Box
@@ -271,6 +282,31 @@ function QuoteTable(props: ShoppingDetailTableProps) {
                   ))}
                 </Box>
               )}
+
+              {!isEnableProduct && currentProduct?.name && (
+                <Box sx={{ color: 'red' }}>
+                  <Box
+                    sx={{
+                      mt: '1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      '& svg': { mr: '0.5rem' },
+                    }}
+                  >
+                    <WarningIcon color="error" fontSize="small" />
+                    {currentProduct?.type === 'oos'
+                      ? b3Lang('quoteDraft.quoteTable.outOfStock.tip')
+                      : b3Lang('quoteDraft.quoteTable.unavailable.tip')}
+                  </Box>
+                  {currentProduct?.type === 'oos' && (
+                    <Box>
+                      {b3Lang('quoteDraft.quoteTable.oosNumber.tip', {
+                        qty: inventoryLevel,
+                      })}
+                    </Box>
+                  )}
+                </Box>
+              )}
             </Box>
           </Box>
         );
@@ -283,7 +319,7 @@ function QuoteTable(props: ShoppingDetailTableProps) {
       render: (row: CustomFieldItems) => {
         const { basePrice, taxPrice } = row;
 
-        const inTaxPrice = getBCPrice(+basePrice, +taxPrice);
+        const inTaxPrice = getBCPrice(Number(basePrice), Number(taxPrice));
         return (
           <Typography
             sx={{
@@ -291,7 +327,7 @@ function QuoteTable(props: ShoppingDetailTableProps) {
             }}
           >
             {getDisplayPrice({
-              price: `${currencyFormat(inTaxPrice)}`,
+              price: currencyFormat(inTaxPrice),
               productInfo: row,
               showText: b3Lang('quoteDraft.quoteSummary.tbd'),
             })}
@@ -318,10 +354,10 @@ function QuoteTable(props: ShoppingDetailTableProps) {
             pattern: '[0-9]*',
           }}
           onChange={(e) => {
-            handleUpdateProductQty(row, +e.target.value);
+            handleUpdateProductQty(row, Number(e.target.value));
           }}
           onBlur={(e) => {
-            handleCheckProductQty(row, +e.target.value);
+            handleCheckProductQty(row, Number(e.target.value));
           }}
           sx={{
             width: '75%',
@@ -339,8 +375,8 @@ function QuoteTable(props: ShoppingDetailTableProps) {
       render: (row) => {
         const { basePrice, quantity, taxPrice } = row;
 
-        const inTaxPrice = getBCPrice(+basePrice, +taxPrice);
-        const total = inTaxPrice * +quantity;
+        const inTaxPrice = getBCPrice(Number(basePrice), Number(taxPrice));
+        const total = inTaxPrice * Number(quantity);
         const optionList = JSON.parse(row.optionList);
 
         return (
@@ -351,7 +387,7 @@ function QuoteTable(props: ShoppingDetailTableProps) {
               }}
             >
               {getDisplayPrice({
-                price: `${currencyFormat(total)}`,
+                price: currencyFormat(total),
                 productInfo: row,
                 showText: b3Lang('quoteDraft.quoteSummary.tbd'),
               })}
@@ -437,7 +473,7 @@ function QuoteTable(props: ShoppingDetailTableProps) {
         showBorder={false}
         itemIsMobileSpacing={0}
         noDataText={b3Lang('quoteDraft.quoteTable.noProducts')}
-        renderItem={(row: QuoteItem, index?: number) => (
+        renderItem={(row, index?) => (
           <QuoteTableCard
             len={total || 0}
             item={row}

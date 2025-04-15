@@ -4,7 +4,9 @@
     {
       "files": ["src/pages/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
       "rules": {
-        "no-param-reassign": 0
+        "no-param-reassign": 0,
+        "@typescript-eslint/no-explicit-any": 0,
+        "@typescript-eslint/naming-convention": 0
       }
     },
     {
@@ -40,7 +42,7 @@
         "src/pages/PDP/index.tsx",
         "src/pages/QuickOrder/components/QuickOrderCard.tsx",
         "src/pages/QuickOrder/components/QuickOrderPad.tsx",
-        "src/pages/QuickOrder/components/QuickorderTable.tsx",
+        "src/pages/QuickOrder/components/QuickOrderB2BTable.tsx",
         "src/pages/Registered/RegisterComplete.tsx",
         "src/pages/Registered/RegisteredAccount.tsx",
         "src/pages/Registered/RegisteredStep.tsx",
@@ -94,7 +96,8 @@
         "src/**.d.ts"
       ],
       "rules": {
-        "@typescript-eslint/no-explicit-any": 0
+        "@typescript-eslint/no-explicit-any": 0,
+        "@typescript-eslint/naming-convention": 0
       }
     },
     {

@@ -8,23 +8,28 @@ import { b3HexToRgb, getContrastColor } from '@/components/outSideComponents/uti
 import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   getB2BAddressConfig,
   getB2BOrderDetails,
-  getB2BVariantInfoBySkus,
   getBCOrderDetails,
   getBcOrderStatusType,
-  getBcVariantInfoBySkus,
   getOrderStatusType,
 } from '@/shared/service/b2b';
+import { getNSReturnDetails } from '@/shared/service/b2b/graphql/orders';
 import { isB2BUserSelector, useAppSelector } from '@/store';
+import { AddressConfigItem, OrderProductItem, OrderStatusItem } from '@/types';
 import b2bLogger from '@/utils/b3Logger';
 
-import { AddressConfigItem, OrderStatusItem } from '../../types';
 import OrderStatus from '../order/components/OrderStatus';
 import { orderStatusTranslationVariables } from '../order/shared/getOrderStatus';
 
+import {
+  NSOrderDetailsContext,
+  NSOrderDetailsProvider,
+} from './components/context/NSOrderDetailsContext';
+import NSOrderItemList from './components/netsuite/OrderItemList';
+import OrderOtherDetails from './components/netsuite/OrderOtherDetails';
 import { OrderDetailsContext, OrderDetailsProvider } from './context/OrderDetailsContext';
 import convertB2BOrderDetails from './shared/B2BOrderData';
 import {
@@ -43,30 +48,26 @@ interface LocationState {
 
 function OrderDetail() {
   const isB2BUser = useAppSelector(isB2BUserSelector);
-
   const params = useParams();
-
   const navigate = useNavigate();
-
   const b3Lang = useB3Lang();
 
   const {
     state: { addressConfig },
     dispatch: globalDispatch,
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const {
-    state: {
-      poNumber,
-      status = '',
-      customStatus,
-      orderSummary,
-      orderStatus = [],
-      variantImages = [],
-    },
+    state: { poNumber, status = '', customStatus, orderSummary, orderStatus = [] },
     state: detailsData,
     dispatch,
   } = useContext(OrderDetailsContext);
+
+  const {
+    state: { orderNumber, status: nSOrderStatus = '' },
+    state: nsDetailsData,
+    dispatch: NSDispatch,
+  } = useContext(NSOrderDetailsContext);
 
   const {
     state: {
@@ -74,30 +75,90 @@ function OrderDetail() {
     },
   } = useContext(CustomStyleContext);
 
+  const { id: currentCompanyId } = useAppSelector(({ company }) => company.companyInfo);
   const customColor = getContrastColor(backgroundColor);
-
   const localtion = useLocation();
-
   const [isMobile] = useMobile();
   const [preOrderId, setPreOrderId] = useState('');
   const [orderId, setOrderId] = useState('');
+  const [nsInternalId, setNSInternalID] = useState('');
   const [isRequestLoading, setIsRequestLoading] = useState(false);
-  const [canGetVariantImages, setCanGetVariantImages] = useState(false);
+  const [isCurrentCompany, setIsCurrentCompany] = useState(false);
 
-  useEffect(() => {
-    setOrderId(params.id || '');
-  }, [params]);
+  const customerId = useAppSelector(({ company }) => company.customer.id);
 
   const goToOrders = () => {
-    navigate(
-      `${(localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders'}`,
-    );
+    navigate((localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders', {
+      state: {
+        isNetsuiteOrder: nsInternalId ? 1 : 0,
+      },
+    });
   };
+
+  const checkOrderValue = (bcOrder: string) => {
+    const parsedValue = parseFloat(bcOrder);
+    return Number.isNaN(parsedValue) ? '' : bcOrder;
+  };
+
+  useEffect(() => {
+    let paramId;
+
+    if (params?.id?.includes('ns-')) {
+      paramId = params?.id?.split('-')[1];
+      setNSInternalID(paramId);
+    } else {
+      paramId = params.id || '';
+      setOrderId(paramId);
+    }
+  }, [params]);
+
+  useEffect(() => {
+    const getReturnDetails = async () => {
+      const id = parseInt(nsInternalId, 10);
+      if (!id) return;
+
+      setIsRequestLoading(true);
+
+      try {
+        const data = [
+          {
+            order_id: parseInt(nsInternalId, 10),
+            customer_id: customerId.toString(),
+            return_reason: [],
+            line_items: [],
+            submitType: 'get-order',
+          },
+        ];
+
+        const req = getNSReturnDetails(data);
+        const nsDetails = await req;
+
+        NSDispatch({
+          type: 'all',
+          payload: nsDetails,
+        });
+
+        const bcOrder = checkOrderValue(nsDetails?.bcOrderNum);
+        if (bcOrder) setOrderId(bcOrder);
+      } catch (err) {
+        if (err === 'order does not exist') {
+          setTimeout(() => {
+            // window.location.hash = `/orderDetail/${preOrderId}`;
+          }, 1000);
+        }
+      } finally {
+        setIsRequestLoading(false);
+      }
+    };
+
+    getReturnDetails();
+  }, [nsInternalId, NSDispatch, customerId]);
 
   useEffect(() => {
     if (orderId) {
       const getOrderDetails = async () => {
         const id = parseInt(orderId, 10);
+
         if (!id) {
           return;
         }
@@ -108,21 +169,35 @@ function OrderDetail() {
           const order = isB2BUser ? await getB2BOrderDetails(id) : await getBCOrderDetails(id);
 
           if (order) {
+            const { products, companyInfo } = order;
+
+            const newOrder = {
+              ...order,
+              products: products.map((item: OrderProductItem) => {
+                return {
+                  ...item,
+                  imageUrl: item?.variantImageUrl || item.imageUrl,
+                };
+              }),
+            };
+
+            setIsCurrentCompany(Number(companyInfo.companyId) === Number(currentCompanyId));
+
             const data = isB2BUser
-              ? convertB2BOrderDetails(order, b3Lang)
-              : convertBCOrderDetails(order, b3Lang);
+              ? convertB2BOrderDetails(newOrder, b3Lang)
+              : convertBCOrderDetails(newOrder, b3Lang);
             dispatch({
               type: 'all',
               payload: data,
             });
             setPreOrderId(orderId);
-            dispatch({
-              type: 'variantImages',
-              payload: {
-                variantImages: [],
-              },
-            });
-            setCanGetVariantImages(true);
+            // dispatch({
+            //   type: 'variantImages',
+            //   payload: {
+            //     variantImages: [],
+            //   },
+            // });
+            // setCanGetVariantImages(true);
           }
         } catch (err) {
           if (err === 'order does not exist') {
@@ -134,7 +209,6 @@ function OrderDetail() {
           setIsRequestLoading(false);
         }
       };
-
       const getOrderStatus = async () => {
         const orderStatus = isB2BUser ? await getOrderStatusType() : await getBcOrderStatusType();
 
@@ -145,7 +219,6 @@ function OrderDetail() {
           },
         });
       };
-
       getOrderDetails();
       getOrderStatus();
     }
@@ -162,7 +235,7 @@ function OrderDetail() {
       try {
         let configList = addressConfig;
         if (!configList) {
-          const { addressConfig: newConfig }: CustomFieldItems = await getB2BAddressConfig();
+          const { addressConfig: newConfig } = await getB2BAddressConfig();
           configList = newConfig;
 
           globalDispatch({
@@ -205,40 +278,6 @@ function OrderDetail() {
     }
     return activeStatusLabel;
   };
-
-  useEffect(() => {
-    const getVariantImage = async () => {
-      const products = detailsData.products || [];
-
-      const skus = products.map((product) => product.sku);
-      if (skus.length > 0) {
-        const getVariantInfoBySku = isB2BUser ? getB2BVariantInfoBySkus : getBcVariantInfoBySkus;
-
-        const { variantSku: variantInfoList = [] }: CustomFieldItems = await getVariantInfoBySku({
-          skus,
-        });
-
-        const newVariantImages = variantInfoList.map((variantInfo: CustomFieldItems) => ({
-          variantId: variantInfo.variantId,
-          variantSku: variantInfo.variantSku,
-          variantImage: variantInfo.imageUrl,
-        }));
-
-        dispatch({
-          type: 'variantImages',
-          payload: {
-            variantImages: newVariantImages,
-          },
-        });
-        setCanGetVariantImages(false);
-      }
-    };
-
-    if (variantImages.length === 0 && canGetVariantImages) {
-      getVariantImage();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canGetVariantImages]);
 
   return (
     <B3Spin isSpinning={isRequestLoading} background="rgba(255,255,255,0.2)">
@@ -297,32 +336,38 @@ function OrderDetail() {
                 color: b3HexToRgb(customColor, 0.87) || '#263238',
               }}
             >
-              {b3Lang('orderDetail.orderId', { orderId })}
+              {b3Lang('orderDetail.orderId', { orderId: orderId || orderNumber || '' })}
               {b3Lang('orderDetail.purchaseOrderNumber', {
                 purchaseOrderNumber: poNumber ?? '',
               })}
             </Typography>
-            <OrderStatus code={status} text={getOrderStatusLabel(status)} />
+            <OrderStatus
+              code={nsInternalId ? nSOrderStatus : status}
+              text={getOrderStatusLabel(nsInternalId ? nSOrderStatus : status)}
+            />
           </Grid>
-          <Grid
-            container
-            item
-            xs={isMobile ? 12 : 4}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            {localtion?.state && (
-              <DetailPagination
-                onChange={(orderId) => handlePageChange(orderId)}
-                color={customColor}
-              />
-            )}
-          </Grid>
+          {!nsInternalId ? (
+            <Grid
+              container
+              item
+              xs={isMobile ? 12 : 4}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+              }}
+            >
+              {localtion?.state && (
+                <DetailPagination
+                  onChange={(orderId) => handlePageChange(orderId)}
+                  color={customColor}
+                />
+              )}
+            </Grid>
+          ) : (
+            ''
+          )}
         </Grid>
-
         <Grid
           container
           spacing={2}
@@ -347,11 +392,15 @@ function OrderDetail() {
             }
           >
             <Stack spacing={3}>
-              <OrderShipping />
-              {/* Digital Order Display */}
-              <OrderBilling />
-
-              <OrderHistory />
+              {nsInternalId ? (
+                <NSOrderItemList />
+              ) : (
+                <>
+                  <OrderShipping isCurrentCompany={isCurrentCompany} />
+                  <OrderBilling isCurrentCompany={isCurrentCompany} />
+                  <OrderHistory />
+                </>
+              )}
             </Stack>
           </Grid>
           <Grid
@@ -366,8 +415,9 @@ function OrderDetail() {
                   }
             }
           >
+            {nsInternalId && nsDetailsData ? <OrderOtherDetails /> : ''}
             {JSON.stringify(orderSummary) === '{}' ? null : (
-              <OrderAction detailsData={detailsData} />
+              <OrderAction detailsData={detailsData} isCurrentCompany={isCurrentCompany} />
             )}
           </Grid>
         </Grid>
@@ -379,7 +429,9 @@ function OrderDetail() {
 function OrderDetailsContent() {
   return (
     <OrderDetailsProvider>
-      <OrderDetail />
+      <NSOrderDetailsProvider>
+        <OrderDetail />
+      </NSOrderDetailsProvider>
     </OrderDetailsProvider>
   );
 }

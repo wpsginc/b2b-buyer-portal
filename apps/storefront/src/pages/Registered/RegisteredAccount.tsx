@@ -11,34 +11,23 @@ import {
   checkUserEmail,
   validateBCCompanyUserExtraFields,
 } from '@/shared/service/b2b';
-import {
-  isB2BUserSelector,
-  isValidUserTypeSelector,
-  themeFrameSelector,
-  useAppSelector,
-} from '@/store';
+import { themeFrameSelector, useAppSelector } from '@/store';
 import { channelId } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 
-import RegisteredStepButton from './component/RegisteredStepButton';
 import { RegisteredContext } from './context/RegisteredContext';
 import { Base64, emailError } from './config';
+import { PrimaryButton } from './PrimaryButton';
 import { InformationFourLabels, TipContent } from './styled';
 import { RegisterFields } from './types';
 
 interface RegisteredAccountProps {
-  handleBack: () => void;
   handleNext: () => void;
-  activeStep: number;
 }
 
-export default function RegisteredAccount(props: RegisteredAccountProps) {
-  const { handleBack, handleNext, activeStep } = props;
-
+export default function RegisteredAccount({ handleNext }: RegisteredAccountProps) {
   const { state, dispatch } = useContext(RegisteredContext);
-  const isB2BUser = useAppSelector(isB2BUserSelector);
   const IframeDocument = useAppSelector(themeFrameSelector);
-  const isValidUserType = useAppSelector(isValidUserTypeSelector);
 
   const {
     state: {
@@ -83,10 +72,28 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
       info.tipText = 'This email will be used to sign in to your account';
     }
 
+    if (contactInfo.fieldId === 'field_phone_number' && accountType === '1') {
+      info.isTip = true;
+      info.tipText = 'Please enter your 10 digit phone number';
+      info.maxLength = 10;
+      info.pattern = '[0-9]*';
+    }
+
     return contactInfo;
   });
 
-  const contactInfo: any = accountType === '1' ? newContactInformation : bcContactInformation || [];
+  const newbcContactInformation = bcContactInformation?.map((contactInfo: CustomFieldItems) => {
+    const info = contactInfo;
+    if (contactInfo.fieldId === 'field_phone_number' && accountType === '1') {
+      info.isTip = true;
+      info.tipText = 'Please enter your 10 digit phone number';
+    }
+
+    return contactInfo;
+  });
+
+  const contactInfo: any =
+    accountType === '1' ? newContactInformation : newbcContactInformation || [];
   const contactName = accountType === '1' ? 'contactInformation' : 'bcContactInformationFields';
 
   const contactInformationLabel = contactInfo.length ? contactInfo[0]?.groupName : '';
@@ -115,14 +122,23 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
     contactInformation?.find((item: CustomFieldItems) => item.fieldId === 'field_email')?.name ||
     'email';
 
+  const phoneNumber =
+    contactInformation?.find((item: CustomFieldItems) => item.fieldId === 'field_phone_number')
+      ?.name || 'phone';
+
   const validateEmailValue = async (email: string) => {
+    const isRegisterAsB2BUser = accountType === '1';
     try {
       showLoading(true);
-      const { userType, userInfo: { companyName = '' } = {} } = isB2BUser
+      const {
+        isValid,
+        userType,
+        userInfo: { companyName = '' } = {},
+      } = isRegisterAsB2BUser
         ? await checkUserEmail({ email, channelId })
         : await checkUserBCEmail({ email, channelId });
 
-      if (!isValidUserType) {
+      if (!isValid) {
         setErrorTips(
           b3Lang(emailError[userType], {
             companyName: companyName || '',
@@ -139,7 +155,7 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
         setErrorTips('');
       }
 
-      return isValidUserType;
+      return isValid;
     } catch (error) {
       return false;
     } finally {
@@ -150,6 +166,14 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
   const handleAccountToDetail = async (event: MouseEvent) => {
     handleSubmit(async (data: CustomFieldItems) => {
       if (!(await validateEmailValue(data[emailName]))) {
+        return;
+      }
+
+      if (data[phoneNumber]?.length > 10 || data[phoneNumber]?.length < 10) {
+        setError(phoneNumber, {
+          type: 'custom',
+          message: 'Please enter a valid phone number',
+        });
         return;
       }
 
@@ -244,7 +268,6 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
           <TipContent>{errorTips}</TipContent>
         </Alert>
       )}
-
       <FormControl
         sx={{
           '& h4': {
@@ -285,7 +308,6 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
           )}
         </RadioGroup>
       </FormControl>
-
       <Box
         sx={{
           '& h4': {
@@ -314,7 +336,6 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
           setValue={setValue}
         />
       </Box>
-
       <Box />
       {additionalInfo && additionalInfo.length ? (
         <Box
@@ -344,11 +365,17 @@ export default function RegisteredAccount(props: RegisteredAccountProps) {
         ''
       )}
 
-      <RegisteredStepButton
-        activeStep={activeStep}
-        handleBack={handleBack}
-        handleNext={handleAccountToDetail}
-      />
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          pt: 2,
+        }}
+      >
+        <PrimaryButton onClick={handleAccountToDetail}>
+          {b3Lang('global.button.next')}
+        </PrimaryButton>
+      </Box>
     </Box>
   );
 }

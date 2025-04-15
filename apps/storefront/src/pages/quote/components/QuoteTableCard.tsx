@@ -48,9 +48,9 @@ function QuoteTableCard(props: QuoteTableCardProps) {
 
   const b3Lang = useB3Lang();
 
-  const price = getBCPrice(+basePrice, +taxPrice);
+  const price = getBCPrice(Number(basePrice), Number(taxPrice));
 
-  const total = price * +quantity;
+  const total = price * Number(quantity);
 
   const product: any = {
     ...quoteTableItem.productsSearch,
@@ -64,14 +64,14 @@ function QuoteTableCard(props: QuoteTableCardProps) {
 
   const { productUrl } = productsSearch;
 
-  const siglePrice = getDisplayPrice({
-    price: `${currencyFormat(price)}`,
+  const singlePrice = getDisplayPrice({
+    price: currencyFormat(price),
     productInfo: quoteTableItem,
     showText: b3Lang('quoteDraft.quoteSummary.tbd'),
   });
 
   const totalPrice = getDisplayPrice({
-    price: `${currencyFormat(total)}`,
+    price: currencyFormat(total),
     productInfo: quoteTableItem,
     showText: b3Lang('quoteDraft.quoteSummary.tbd'),
   });
@@ -148,7 +148,7 @@ function QuoteTableCard(props: QuoteTableCardProps) {
             )}
           </Box>
 
-          <Typography sx={{ fontSize: '14px' }}>{`Price: ${siglePrice}`}</Typography>
+          <Typography sx={{ fontSize: '14px' }}>{`Price: ${singlePrice}`}</Typography>
 
           <TextField
             size="small"

@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
 import { ArrowBackIosNew } from '@mui/icons-material';
@@ -10,8 +10,11 @@ import { useMobile } from '@/hooks';
 import { type SetOpenPage } from '@/pages/SetOpenPage';
 import { CustomStyleContext } from '@/shared/customStyleButton';
 import { rolePermissionSelector, useAppSelector } from '@/store';
+import { ShoppingListStatus } from '@/types/shoppingList';
+import { verifyLevelPermission, verifySubmitShoppingListSubsidiariesPermission } from '@/utils';
+import { b2bPermissionsMap } from '@/utils/b3CheckPermissions/config';
 
-import { ShoppingStatus } from '../../ShoppingLists/ShoppingStatus';
+import { ShoppingListStatusTag } from '../../ShoppingLists/ShoppingListStatusTag';
 
 const StyledCreateName = styled('div')(() => ({
   display: 'flex',
@@ -55,10 +58,57 @@ function ShoppingDetailHeader(props: ShoppingDetailHeaderProps) {
   } = useContext(CustomStyleContext);
   const navigate = useNavigate();
 
+  const { selectCompanyHierarchyId } = useAppSelector(
+    ({ company }) => company.companyHierarchyInfo,
+  );
+
+  const {
+    submitShoppingListPermission: submitShoppingList,
+    approveShoppingListPermission: approveShoppingList,
+  } = useAppSelector(rolePermissionSelector);
+
+  const shoppingListPermissions = useMemo(() => {
+    if (isB2BUser) {
+      const companyInfo = shoppingListInfo?.companyInfo || {};
+
+      const {
+        submitShoppingListPermission: submitShoppingListPermissionCode,
+        approveShoppingListPermission: approveShoppingListPermissionCode,
+      } = b2bPermissionsMap;
+      const submitShoppingListPermissionLevel = verifySubmitShoppingListSubsidiariesPermission({
+        code: submitShoppingListPermissionCode,
+        userId: Number(customerInfo?.userId || 0),
+        selectId: Number(selectCompanyHierarchyId),
+      });
+
+      const approveShoppingListPermissionLevel = verifyLevelPermission({
+        code: approveShoppingListPermissionCode,
+        companyId: Number(companyInfo?.companyId || 0),
+        userId: Number(customerInfo?.userId || 0),
+      });
+
+      return {
+        submitShoppingListPermission: submitShoppingListPermissionLevel,
+        approveShoppingListPermission: approveShoppingListPermissionLevel,
+      };
+    }
+
+    return {
+      submitShoppingListPermission: submitShoppingList,
+      approveShoppingListPermission: approveShoppingList,
+    };
+  }, [
+    customerInfo,
+    isB2BUser,
+    submitShoppingList,
+    approveShoppingList,
+    shoppingListInfo?.companyInfo,
+    selectCompanyHierarchyId,
+  ]);
+
   const isDisabledBtn = shoppingListInfo?.products?.edges.length === 0;
 
-  const { submitShoppingListPermission, approveShoppingListPermission } =
-    useAppSelector(rolePermissionSelector);
+  const { submitShoppingListPermission, approveShoppingListPermission } = shoppingListPermissions;
 
   const gridOptions = (xs: number) =>
     isMobile
@@ -120,8 +170,8 @@ function ShoppingDetailHeader(props: ShoppingDetailHeaderProps) {
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
-          flexDirection: `${isMobile ? 'column' : 'row'}`,
-          mb: `${isMobile ? '16px' : ''}`,
+          flexDirection: isMobile ? 'column' : 'row',
+          mb: isMobile ? '16px' : '',
         }}
       >
         <Grid
@@ -134,8 +184,8 @@ function ShoppingDetailHeader(props: ShoppingDetailHeaderProps) {
           <Box
             sx={{
               display: 'flex',
-              alignItems: `${isMobile ? 'start' : 'center'}`,
-              flexDirection: `${isMobile ? 'column' : 'row'}`,
+              alignItems: isMobile ? 'start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row',
             }}
           >
             <Typography
@@ -152,10 +202,10 @@ function ShoppingDetailHeader(props: ShoppingDetailHeaderProps) {
                 (approveShoppingListPermission && shoppingListInfo?.approvedFlag)) && (
                 <Typography
                   sx={{
-                    m: `${isMobile ? '10px 0' : '0'}`,
+                    m: isMobile ? '10px 0' : '0',
                   }}
                 >
-                  {shoppingListInfo && <ShoppingStatus status={shoppingListInfo?.status} />}
+                  {shoppingListInfo && <ShoppingListStatusTag status={shoppingListInfo?.status} />}
                 </Typography>
               )}
           </Box>
@@ -187,46 +237,48 @@ function ShoppingDetailHeader(props: ShoppingDetailHeaderProps) {
         <Grid
           item
           sx={{
-            textAlign: `${isMobile ? 'none' : 'end'}`,
+            textAlign: isMobile ? 'none' : 'end',
           }}
           {...gridOptions(4)}
         >
-          {submitShoppingListPermission && shoppingListInfo?.status === 30 && (
-            <CustomButton
-              variant="outlined"
-              disabled={isDisabledBtn}
-              onClick={() => {
-                handleUpdateShoppingList(40);
-              }}
-            >
-              {b3Lang('shoppingList.header.submitForApproval')}
-            </CustomButton>
-          )}
-          {approveShoppingListPermission && shoppingListInfo?.status === 40 && (
-            <Box>
+          {submitShoppingListPermission &&
+            shoppingListInfo?.status === ShoppingListStatus.Draft && (
               <CustomButton
                 variant="outlined"
-                sx={{
-                  marginRight: '1rem',
-                }}
+                disabled={isDisabledBtn}
                 onClick={() => {
-                  handleUpdateShoppingList(20);
+                  handleUpdateShoppingList(ShoppingListStatus.ReadyForApproval);
                 }}
               >
-                {b3Lang('shoppingList.header.reject')}
+                {b3Lang('shoppingList.header.submitForApproval')}
               </CustomButton>
-              {approveShoppingListPermission && (
+            )}
+          {approveShoppingListPermission &&
+            shoppingListInfo?.status === ShoppingListStatus.ReadyForApproval && (
+              <Box>
                 <CustomButton
                   variant="outlined"
+                  sx={{
+                    marginRight: '1rem',
+                  }}
                   onClick={() => {
-                    handleUpdateShoppingList(0);
+                    handleUpdateShoppingList(ShoppingListStatus.Rejected);
                   }}
                 >
-                  {b3Lang('shoppingList.header.approve')}
+                  {b3Lang('shoppingList.header.reject')}
                 </CustomButton>
-              )}
-            </Box>
-          )}
+                {approveShoppingListPermission && (
+                  <CustomButton
+                    variant="outlined"
+                    onClick={() => {
+                      handleUpdateShoppingList(ShoppingListStatus.Approved);
+                    }}
+                  >
+                    {b3Lang('shoppingList.header.approve')}
+                  </CustomButton>
+                )}
+              </Box>
+            )}
         </Grid>
       </Grid>
     </>

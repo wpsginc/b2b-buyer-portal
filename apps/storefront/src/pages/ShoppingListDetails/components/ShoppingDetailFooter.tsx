@@ -9,7 +9,7 @@ import { successTip } from '@/components';
 import CustomButton from '@/components/button/CustomButton';
 import { CART_URL, CHECKOUT_URL, PRODUCT_DEFAULT_IMAGE } from '@/constants';
 import { useMobile } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   getB2BVariantInfoBySkus,
   getBcVariantInfoBySkus,
@@ -18,6 +18,7 @@ import {
 } from '@/shared/service/b2b/graphql/product';
 import { deleteCart, getCart } from '@/shared/service/bc/graphql/cart';
 import { rolePermissionSelector, useAppSelector } from '@/store';
+import { ShoppingListStatus } from '@/types/shoppingList';
 import { currencyFormat, snackbar } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 import {
@@ -26,7 +27,7 @@ import {
   validProductQty,
 } from '@/utils/b3Product/b3Product';
 import {
-  addlineItems,
+  addLineItems,
   conversionProductsList,
   ProductsProps,
 } from '@/utils/b3Product/shared/config';
@@ -79,12 +80,15 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
 
   const {
     state: { productQuoteEnabled = false },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
   const companyId = useAppSelector(({ company }) => company.companyInfo.id);
   const customerGroupId = useAppSelector(({ company }) => company.customer.customerGroupId);
-  const { shoppingListActionsPermission, purchasabilityPermission, submitShoppingListPermission } =
-    useAppSelector(rolePermissionSelector);
+  const {
+    shoppingListCreateActionsPermission,
+    purchasabilityPermission,
+    submitShoppingListPermission,
+  } = useAppSelector(rolePermissionSelector);
   const ref = useRef<HTMLButtonElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -114,9 +118,11 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
     role,
   } = props;
 
-  const b2bShoppingListActionsPermission = isB2BUser ? shoppingListActionsPermission : true;
+  const b2bShoppingListActionsPermission = isB2BUser ? shoppingListCreateActionsPermission : true;
   const isCanAddToCart = isB2BUser ? purchasabilityPermission : true;
-  const b2bSubmitShoppingListPermission = isB2BUser ? submitShoppingListPermission : +role === 2;
+  const b2bSubmitShoppingListPermission = isB2BUser
+    ? submitShoppingListPermission
+    : Number(role) === 2;
 
   const handleOpenBtnList = () => {
     if (checkedArr.length === 0) {
@@ -145,19 +151,19 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
         let isPassVerify = true;
         if (
           inventoryInfo.isStock === '1' &&
-          (node?.quantity ? +node.quantity : 0) > inventoryInfo.stock
+          (node?.quantity ? Number(node.quantity) : 0) > inventoryInfo.stock
         )
           isPassVerify = false;
 
         if (
           inventoryInfo.minQuantity !== 0 &&
-          (node?.quantity ? +node.quantity : 0) < inventoryInfo.minQuantity
+          (node?.quantity ? Number(node.quantity) : 0) < inventoryInfo.minQuantity
         )
           isPassVerify = false;
 
         if (
           inventoryInfo.maxQuantity !== 0 &&
-          (node?.quantity ? +node.quantity : 0) > inventoryInfo.maxQuantity
+          (node?.quantity ? Number(node.quantity) : 0) > inventoryInfo.maxQuantity
         )
           isPassVerify = false;
 
@@ -244,7 +250,7 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
       );
 
       if (validateSuccessArr.length !== 0) {
-        const lineItems = addlineItems(validateSuccessArr);
+        const lineItems = addLineItems(validateSuccessArr);
         const deleteCartObject = deleteCartData(cartEntityId);
         const cartInfo = await getCart();
         let res = null;
@@ -263,7 +269,7 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
           if (
             allowJuniorPlaceOrder &&
             b2bSubmitShoppingListPermission &&
-            shoppingListInfo?.status === 0
+            shoppingListInfo?.status === ShoppingListStatus.Approved
           ) {
             window.location.href = CHECKOUT_URL;
           } else {
@@ -343,8 +349,8 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
       productsWithSku.forEach((product: ListItemProps) => {
         const { node } = product;
 
-        if (!productIds.includes(+node.productId)) {
-          productIds.push(+node.productId);
+        if (!productIds.includes(Number(node.productId))) {
+          productIds.push(Number(node.productId));
         }
       });
 
@@ -379,7 +385,7 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
         const optionsList = getOptionsList(JSON.parse(optionList));
 
         const currentProductSearch = newProductInfo.find(
-          (product: CustomFieldItems) => +product.id === +productId,
+          (product: CustomFieldItems) => Number(product.id) === Number(productId),
         );
 
         const variantItem = currentProductSearch?.variants.find(
@@ -401,7 +407,7 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
             productsSearch: currentProductSearch,
             primaryImage: variantItem?.image_url || PRODUCT_DEFAULT_IMAGE,
             productName,
-            quantity: +quantity || 1,
+            quantity: Number(quantity) || 1,
             optionList: JSON.stringify(optionsList),
             productId,
             basePrice,
@@ -482,7 +488,7 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
   };
 
   const allowButtonList = () => {
-    if (!(shoppingListInfo?.status === 0 || !isB2BUser)) return [];
+    if (!(shoppingListInfo?.status === ShoppingListStatus.Approved || !isB2BUser)) return [];
 
     if (!isCanAddToCart && isB2BUser)
       return productQuoteEnabled ? [buttons.addSelectedToQuote] : [];
@@ -603,7 +609,7 @@ function ShoppingDetailFooter(props: ShoppingDetailFooterProps) {
                       margin: isMobile ? '0 1rem 0 0' : '0 1rem',
                       minWidth: 'auto',
                     }}
-                    disabled={shoppingListInfo?.status === 40}
+                    disabled={shoppingListInfo?.status === ShoppingListStatus.ReadyForApproval}
                   >
                     <Delete
                       color="primary"

@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useState } from 'react';
-import globalB3 from '@b3/global-b3';
+import config from '@b3/global-b3';
 
 import { CHECKOUT_URL } from '@/constants';
 import { useAppSelector } from '@/store';
@@ -64,9 +64,19 @@ const useB3AppOpen = (initOpenState: OpenPageState) => {
     return isSearchNode;
   };
 
+  const handleJudgeCheckoutNormalHref = (element: MouseEvent) => {
+    if (window?.location?.pathname !== CHECKOUT_URL) return false;
+
+    const target = element.target as HTMLAnchorElement;
+
+    if (target.getAttribute('href') && target.getAttribute('href') === '#') return true;
+
+    return false;
+  };
+
   useLayoutEffect(() => {
-    const registerArr = Array.from(document.querySelectorAll(globalB3['dom.registerElement']));
-    const allOtherArr = Array.from(document.querySelectorAll(globalB3['dom.allOtherElement']));
+    const registerArr = Array.from(document.querySelectorAll(config['dom.registerElement']));
+    const allOtherArr = Array.from(document.querySelectorAll(config['dom.allOtherElement']));
 
     if (registerArr.length || allOtherArr.length) {
       const handleTriggerClick = (e: MouseEvent) => {
@@ -75,7 +85,9 @@ const useB3AppOpen = (initOpenState: OpenPageState) => {
           allOtherArr.includes(e.target as Element)
         ) {
           const isSearchNode = handleJudgeSearchNode(e);
-          if (isSearchNode) return false;
+          const isCheckoutNormalHref = handleJudgeCheckoutNormalHref(e);
+
+          if (isSearchNode || isCheckoutNormalHref) return false;
           e.preventDefault();
           e.stopPropagation();
           const isRegisterArrInclude = registerArr.includes(e.target as Element);
@@ -117,13 +129,6 @@ const useB3AppOpen = (initOpenState: OpenPageState) => {
           }
 
           if (
-            window?.location?.pathname === CHECKOUT_URL &&
-            (e.target as HTMLAnchorElement)?.getAttribute('href') === '#'
-          ) {
-            href = '/register';
-          }
-
-          if (
             isLogin &&
             href.includes('/login') &&
             !href.includes('action=create_account') &&
@@ -150,7 +155,7 @@ const useB3AppOpen = (initOpenState: OpenPageState) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkoutRegisterNumber, initOpenState, role]);
 
-  useMutationObservable(globalB3['dom.checkoutRegisterParentElement'], callback);
+  useMutationObservable(config['dom.checkoutRegisterParentElement'], callback);
 
   return [openPage, setOpenPage] as const;
 };

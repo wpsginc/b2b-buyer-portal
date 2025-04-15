@@ -1,6 +1,21 @@
 import { B2BOrderData, OrderStatusItem } from '@/types';
 
+import { convertArrayToGraphql } from '../../../../utils';
 import B3Request from '../../request/b3Fetch';
+
+const companyInfo = `
+  companyInfo {
+    companyId,
+    companyName,
+    companyAddress,
+    companyCountry,
+    companyState,
+    companyCity,
+    companyZipCode,
+    phoneNumber,
+    bcId,
+  }
+`;
 
 const allOrders = (data: CustomFieldItems, fn: string) => `{
   ${fn}(
@@ -15,6 +30,7 @@ const allOrders = (data: CustomFieldItems, fn: string) => `{
     isShowMy: "${data?.isShowMy || 0}"
     orderBy: "${data.orderBy}"
     email: "${data?.email || ''}"
+    ${data?.companyIds ? `companyIds: ${convertArrayToGraphql(data.companyIds || [])}` : ''}
   ){
     totalCount,
     pageInfo{
@@ -49,24 +65,8 @@ const allOrders = (data: CustomFieldItems, fn: string) => `{
         merchantEmail,
         firstName,
         lastName,
-        companyId {
-          id,
-          companyName,
-          bcGroupName,
-          description,
-          catalogId,
-          companyStatus,
-          addressLine1,
-          addressLine2,
-          city,
-          state,
-          zipCode,
-          country,
-          extraFields {
-            fieldName,
-            fieldValue,
-          }
-        }
+        companyName,
+        ${companyInfo}
       }
     }
   }
@@ -169,6 +169,7 @@ const orderDetail = (id: number, fn: string) => `{
       extraFields,
       createdAt,
     },
+    ${companyInfo}
   }
 }`;
 
@@ -188,6 +189,12 @@ const getCreatedByUser = (companyId: number, module: number, fn: string) => `{
     results,
   }
 }`;
+
+export const getCustomData = (data: any) => B3Request.nsBackend(data);
+
+export const getNSReturnDetails = (data: any) => B3Request.nsBackend(data);
+
+export const createNSReturn = (data: any) => B3Request.nsBackend(data);
 
 export const getB2BAllOrders = (data: CustomFieldItems) =>
   B3Request.graphqlB2B({

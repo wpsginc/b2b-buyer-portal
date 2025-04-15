@@ -7,23 +7,20 @@ import isEmpty from 'lodash-es/isEmpty';
 import { B3CustomForm } from '@/components';
 import { getContrastColor } from '@/components/outSideComponents/utils/b3CustomStyles';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { validateBCCompanyExtraFields } from '@/shared/service/b2b';
 
-import RegisteredStepButton from './component/RegisteredStepButton';
 import { RegisteredContext } from './context/RegisteredContext';
-import { Base64, Country, State } from './config';
+import { Country, State, validateExtraFields } from './config';
+import { PrimaryButton } from './PrimaryButton';
 import { InformationFourLabels, TipContent } from './styled';
 import { RegisterFields } from './types';
 
 interface RegisteredDetailProps {
   handleBack: () => void;
   handleNext: () => void;
-  activeStep: number;
 }
 
-export default function RegisteredDetail(props: RegisteredDetailProps) {
+export default function RegisteredDetail({ handleBack, handleNext }: RegisteredDetailProps) {
   const b3Lang = useB3Lang();
-  const { handleBack, handleNext, activeStep } = props;
 
   const { state, dispatch } = useContext(RegisteredContext);
 
@@ -62,6 +59,34 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
   const addressBasicName = accountType === '1' ? 'addressBasicFields' : 'bcAddressBasicFields';
   const addressBasicList = accountType === '1' ? addressBasicFields : bcAddressBasicFields;
 
+  const updatedCompanyInformation = companyInformation?.map(
+    (customFieldsInfo: CustomFieldItems) => {
+      const info = customFieldsInfo;
+      if (customFieldsInfo.label.toLowerCase() === 'do you need terms?' && accountType === '1') {
+        info.isTip = true;
+        info.tipText = `Requesting for terms will require you to submit a form, click here to learn more, `;
+        info.termsLink = '/terms-info';
+      }
+
+      if (customFieldsInfo.fieldId === 'field_company_phone_number' && accountType === '1') {
+        info.isTip = true;
+        info.tipText = `Please enter company 10 digit phone number `;
+        info.maxLength = 10;
+        info.pattern = '[0-9]*';
+      }
+
+      if (customFieldsInfo.fieldId === 'field_company_email' && accountType === '1') {
+        info.isTip = true;
+        info.tipText = `Please enter a valid email `;
+      }
+
+      return customFieldsInfo;
+    },
+  );
+
+  const newCompInfo: any =
+    accountType === '1' ? updatedCompanyInformation : companyInformation || [];
+
   const addressName = addressBasicList[0]?.groupName || '';
 
   const handleCountryChange = useCallback(
@@ -79,9 +104,11 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         if (stateList.length > 0) {
           stateFields.fieldType = 'dropdown';
           stateFields.options = stateList;
+          stateFields.required = true;
         } else {
           stateFields.fieldType = 'text';
           stateFields.options = [];
+          stateFields.required = false;
         }
       }
 
@@ -152,7 +179,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
   }
 
   const saveDetailsData = () => {
-    const data = [...companyInformation, ...companyAttachment, ...addressBasicList].reduce(
+    const data = [...newCompInfo, ...companyAttachment, ...addressBasicList].reduce(
       (formValues: DetailsFormValues, field: RegisterFields) => {
         const values = formValues;
         values[field.name] = getValues(field.name) || field.default;
@@ -162,7 +189,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
       {},
     );
 
-    const newCompanyInformation = setRegisterFieldsValue(companyInformation, data);
+    const newCompanyInformation = setRegisterFieldsValue(newCompInfo, data);
     const newCompanyAttachment = setRegisterFieldsValue(companyAttachment, data);
     const newAddressBasicFields = setRegisterFieldsValue(addressBasicList, data);
 
@@ -179,8 +206,8 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
   const handleValidateAttachmentFiles = () => {
     if (accountType === '1') {
       const formData = getValues();
-      const attachmentsFilesFiled = companyInformation.find(
-        (info) => info.fieldId === 'field_attachments',
+      const attachmentsFilesFiled = newCompInfo.find(
+        (info: any) => info.fieldId === 'field_attachments',
       );
       if (
         !isEmpty(attachmentsFilesFiled) &&
@@ -205,46 +232,69 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
   const handleAccountToFinish = (event: MouseEvent) => {
     const hasAttachmentsFilesError = handleValidateAttachmentFiles();
 
+    const phoneNumber =
+      companyInformation?.find(
+        (item: CustomFieldItems) => item.fieldId === 'field_company_phone_number',
+      )?.name || 'phone';
+
+    const companyEmail =
+      companyInformation?.find((item: CustomFieldItems) => item.fieldId === 'field_company_email')
+        ?.name || 'email';
+
+    const addressPhone =
+      addressBasicList?.find((item: CustomFieldItems) => item.label.includes('Phone Number'))
+        ?.name || 'phone';
+
     handleSubmit(async (data: CustomFieldItems) => {
       if (hasAttachmentsFilesError) return;
       showLoading(true);
 
+      if (data[companyEmail]) {
+        const regex = /^([a-zA-Z0-9_.+-])+@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+        if (!regex.test(data[companyEmail])) {
+          setError(companyEmail, {
+            type: 'custom',
+            message: 'Please use a valid email address, such as user@example.com.',
+          });
+          showLoading(false);
+          return;
+        }
+      }
+
+      if (data[phoneNumber]?.length > 10 || data[phoneNumber]?.length < 10) {
+        setError(phoneNumber, {
+          type: 'custom',
+          message: 'Please enter a valid phone number',
+        });
+        showLoading(false);
+        return;
+      }
+
+      if (data[addressPhone]?.length > 10 || data[addressPhone]?.length < 10) {
+        setError(addressPhone, {
+          type: 'custom',
+          message: 'Please enter a valid phone number',
+        });
+        showLoading(false);
+        return;
+      }
+
       try {
         if (accountType === '1') {
-          const extraCompanyInformation = companyInformation.filter(
-            (item: RegisterFields) => !!item.custom,
-          );
-          const extraFields = extraCompanyInformation.map((field: RegisterFields) => ({
-            fieldName: Base64.decode(field.name),
-            fieldValue: data[field.name] || field.default,
-          }));
-
-          const res = await validateBCCompanyExtraFields({
-            extraFields,
-          });
-
-          if (res.code !== 200) {
-            const message = res.data?.errMsg || res.message || '';
-
-            const messageArr = message.split(':');
-
-            if (messageArr.length >= 2) {
-              const field = extraCompanyInformation.find(
-                (field) => Base64.decode(field.name) === messageArr[0],
-              );
-              if (field) {
-                setError(field.name, {
-                  type: 'manual',
-                  message: messageArr[1],
-                });
-                showLoading(false);
-                return;
-              }
-            }
-            setErrorMessage(message);
-            showLoading(false);
-            return;
-          }
+          await Promise.all([
+            validateExtraFields({
+              fields: companyInformation,
+              data,
+              type: 'company',
+              setError,
+            }),
+            validateExtraFields({
+              fields: addressBasicFields,
+              data,
+              type: 'address',
+              setError,
+            }),
+          ]);
 
           setErrorMessage('');
         }
@@ -254,6 +304,9 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         showLoading(false);
         handleNext();
       } catch (error) {
+        if (typeof error === 'string') {
+          setErrorMessage(error);
+        }
         showLoading(false);
       }
     })(event);
@@ -292,7 +345,7 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         <Box>
           <InformationFourLabels>{businessDetailsName}</InformationFourLabels>
           <B3CustomForm
-            formFields={[...companyInformation]}
+            formFields={[...newCompInfo]}
             errors={errors}
             control={control}
             getValues={getValues}
@@ -314,11 +367,19 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         />
       </Box>
 
-      <RegisteredStepButton
-        handleBack={handleBackAccount}
-        handleNext={handleAccountToFinish}
-        activeStep={activeStep}
-      />
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          pt: 2,
+          gap: 1,
+        }}
+      >
+        <PrimaryButton onClick={handleBackAccount}>{b3Lang('global.button.back')}</PrimaryButton>
+        <PrimaryButton onClick={handleAccountToFinish}>
+          {b3Lang('global.button.next')}
+        </PrimaryButton>
+      </Box>
     </Box>
   );
 }

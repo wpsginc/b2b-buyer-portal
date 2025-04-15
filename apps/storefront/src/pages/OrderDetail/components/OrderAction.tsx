@@ -1,4 +1,4 @@
-import { Fragment, ReactNode, useContext, useState } from 'react';
+import { Fragment, ReactNode, useCallback, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
 import styled from '@emotion/styled';
@@ -6,16 +6,19 @@ import { Box, Card, CardContent, Divider, Typography } from '@mui/material';
 import throttle from 'lodash-es/throttle';
 
 import CustomButton from '@/components/button/CustomButton';
-import { isB2BUserSelector, rolePermissionSelector, useAppSelector } from '@/store';
+import HierarchyDialog from '@/pages/CompanyHierarchy/components/HierarchyDialog';
+import { isB2BUserSelector, useAppSelector } from '@/store';
+import { Address, MoneyFormat, OrderProductItem } from '@/types';
 import {
   b2bPrintInvoice,
   currencyFormat,
   displayFormat,
   ordersCurrencyFormat,
   snackbar,
+  // verifyLevelPermission,
 } from '@/utils';
 
-import { Address, MoneyFormat, OrderProductItem } from '../../../types';
+// import { b2bPermissionsMap } from '@/utils/b3CheckPermissions/config';
 import { OrderDetailsContext, OrderDetailsState } from '../context/OrderDetailsContext';
 
 import OrderDialog from './OrderDialog';
@@ -44,11 +47,11 @@ interface ItemContainerProps {
 const ItemContainer = styled('div')((props: ItemContainerProps) => ({
   display: 'flex',
   justifyContent: 'space-between',
-  fontWeight: props.nameKey === 'Grand total' ? 700 : 400,
+  fontWeight: props.nameKey === 'grandTotal' ? 700 : 400,
 
   '& p': {
     marginTop: 0,
-    marginBottom: props.nameKey === 'Grand total' ? '0' : '12px',
+    marginBottom: props.nameKey === 'grandTotal' ? '0' : '12px',
     lineHeight: 1,
   },
 }));
@@ -64,6 +67,9 @@ interface Infos {
     [k: string]: string;
   };
   money?: MoneyFormat;
+  symbol?: {
+    [k: string]: string;
+  };
 }
 
 interface Buttons {
@@ -85,6 +91,8 @@ interface OrderCardProps {
   role: number | string;
   ipStatus: number;
   invoiceId?: number | string | undefined | null;
+  isCurrentCompany: boolean;
+  switchCompanyId: number | string | undefined;
 }
 
 interface DialogData {
@@ -106,8 +114,10 @@ function OrderCard(props: OrderCardProps) {
     role,
     invoiceId,
     ipStatus,
+    isCurrentCompany,
+    switchCompanyId,
   } = props;
-
+  const displayAsNegativeNumber = ['coupon', 'discountAmount'];
   const b3Lang = useB3Lang();
 
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
@@ -135,6 +145,7 @@ function OrderCard(props: OrderCardProps) {
 
   const navigate = useNavigate();
 
+  const [openSwitchCompany, setOpenSwitchCompany] = useState<boolean>(false);
   const [open, setOpen] = useState<boolean>(false);
   const [type, setType] = useState<string>('');
   const [currentDialogData, setCurrentDialogData] = useState<DialogData>();
@@ -149,6 +160,16 @@ function OrderCard(props: OrderCardProps) {
     infoValue = Object.values(info);
   }
 
+  const handleShowSwitchCompanyModal = () => {
+    if (!isCurrentCompany && switchCompanyId) {
+      setOpenSwitchCompany(true);
+
+      return true;
+    }
+
+    return false;
+  };
+
   const handleOpenDialog = (name: string) => {
     if (name === 'viewInvoice') {
       if (ipStatus !== 0) {
@@ -159,7 +180,9 @@ function OrderCard(props: OrderCardProps) {
     } else if (name === 'printInvoice') {
       window.open(`/account.php?action=print_invoice&order_id=${orderId}`);
     } else {
-      if (!isAgenting && +role === 3) {
+      const isNeedSwitch = handleShowSwitchCompanyModal();
+      if (isNeedSwitch) return;
+      if (!isAgenting && Number(role) === 3) {
         snackbar.error(b3Lang('orderDetail.orderCard.errorMasquerade'));
         return;
       }
@@ -178,9 +201,10 @@ function OrderCard(props: OrderCardProps) {
   if (typeof infos === 'string') {
     showedInformation = infos;
   } else if (infos?.money) {
+    const symbol = infos?.symbol || {};
     showedInformation = infoKey?.map((key: string, index: number) => (
       <Fragment key={key}>
-        {key === 'Grand total' && (
+        {symbol[key] === 'grandTotal' && (
           <Divider
             sx={{
               marginBottom: '1rem',
@@ -189,13 +213,21 @@ function OrderCard(props: OrderCardProps) {
           />
         )}
 
-        <ItemContainer key={key} nameKey={key}>
-          <p>{key}</p>
-          <p>
-            {infos?.money
-              ? `${ordersCurrencyFormat(infos.money, infoValue[index])}`
-              : currencyFormat(infoValue[index])}
-          </p>
+        <ItemContainer key={key} nameKey={symbol[key]}>
+          <p id="item-name-key">{key}</p>
+          {displayAsNegativeNumber.includes(symbol[key]) ? (
+            <p>
+              {infos?.money
+                ? `-${ordersCurrencyFormat(infos.money, infoValue[index])}`
+                : `-${currencyFormat(infoValue[index])}`}
+            </p>
+          ) : (
+            <p>
+              {infos?.money
+                ? ordersCurrencyFormat(infos.money, infoValue[index])
+                : currencyFormat(infoValue[index])}
+            </p>
+          )}
         </ItemContainer>
       </Fragment>
     ));
@@ -216,7 +248,16 @@ function OrderCard(props: OrderCardProps) {
         {subtitle && <div>{subtitle}</div>}
       </Box>
       <CardContent>
-        <Box>{showedInformation}</Box>
+        <Box
+          sx={{
+            '& #item-name-key': {
+              maxWidth: '70%',
+              wordBreak: 'break-word',
+            },
+          }}
+        >
+          {showedInformation}
+        </Box>
       </CardContent>
       <StyledCardActions isShowButtons={isShowButtons}>
         {buttons &&
@@ -246,7 +287,21 @@ function OrderCard(props: OrderCardProps) {
         type={type}
         setOpen={setOpen}
         itemKey={itemKey}
-        orderId={+orderId}
+        orderId={Number(orderId)}
+      />
+
+      <HierarchyDialog
+        open={openSwitchCompany}
+        currentRow={{
+          companyId: Number(switchCompanyId || 0),
+        }}
+        handleClose={() => setOpenSwitchCompany(false)}
+        // loading
+        title={b3Lang('orderDetail.switchCompany.title')}
+        context={b3Lang('orderDetail.switchCompany.content.tipsText')}
+        dialogParams={{
+          rightSizeBtn: b3Lang('global.B2BSwitchCompanyModal.confirm.button'),
+        }}
       />
     </Card>
   );
@@ -254,6 +309,7 @@ function OrderCard(props: OrderCardProps) {
 
 interface OrderActionProps {
   detailsData: OrderDetailsState;
+  isCurrentCompany: boolean;
 }
 
 interface OrderData {
@@ -265,34 +321,53 @@ interface OrderData {
 }
 
 export default function OrderAction(props: OrderActionProps) {
-  const { detailsData } = props;
+  const { detailsData, isCurrentCompany } = props;
   const b3Lang = useB3Lang();
   const isB2BUser = useAppSelector(isB2BUserSelector);
-  const emailAddress = useAppSelector(({ company }) => company.customer.emailAddress);
+  // const emailAddress = useAppSelector(({ company }) => company.customer.emailAddress);
   const role = useAppSelector(({ company }) => company.customer.role);
-  const b2bPermissions = useAppSelector(rolePermissionSelector);
+  // const b2bPermissions = useAppSelector(rolePermissionSelector);
 
   const {
-    state: { addressLabelPermission, createdEmail },
+    state: { addressLabelPermission },
   } = useContext(OrderDetailsContext);
 
   const {
     money,
-    orderSummary: { createAt, name, priceData } = {},
+    orderSummary: { createAt, name, priceData, priceSymbol } = {},
     payment: { billingAddress, paymentMethod, dateCreateAt } = {},
     orderComments = '',
     products,
     orderId,
     ipStatus = 0,
     invoiceId,
+    poNumber,
+    // customerId,
+    companyInfo: { companyId } = {},
   } = detailsData;
+
+  const getPaymentMessage = useCallback(() => {
+    let message = '';
+
+    if (!createAt) return message;
+
+    if (poNumber) {
+      message = b3Lang('orderDetail.paidWithPo', {
+        paidDate: displayFormat(createAt, true),
+      });
+    } else {
+      message = b3Lang('orderDetail.paidInFull', {
+        paidDate: displayFormat(createAt, true),
+      });
+    }
+    return message;
+  }, [poNumber, createAt, b3Lang]);
 
   if (!orderId) {
     return null;
   }
 
-  const { purchasabilityPermission, shoppingListActionsPermission, getInvoicesPermission } =
-    b2bPermissions;
+  // const {} = b2bPermissions;
 
   const getCompanyName = (company: string) => {
     if (addressLabelPermission) {
@@ -365,7 +440,9 @@ export default function OrderAction(props: OrderActionProps) {
       key: 'Re-Order',
       name: 'reOrder',
       variant: 'outlined',
-      isCanShow: isB2BUser ? purchasabilityPermission : true,
+      // isCanShow: isB2BUser ? purchasabilityPermission : true,
+      // hidden as of 08/10/24 until this function is needed
+      isCanShow: false,
     },
     {
       value: b3Lang('orderDetail.return'),
@@ -382,11 +459,16 @@ export default function OrderAction(props: OrderActionProps) {
       key: 'add-to-shopping-list',
       name: 'shoppingList',
       variant: 'outlined',
-      isCanShow: isB2BUser ? shoppingListActionsPermission : true,
+      // isCanShow: isB2BUser ? shoppingListActionsPermission : true,
+      // hidden as of 08/10/24 until this function is needed
+      isCanShow: false,
+      // isCanShow: isB2BUser
+      //   ? shoppingListActionsPermission && shoppingListEnabled
+      //   : shoppingListEnabled,
     },
   ];
 
-  const invoiceBtnPermissions = +ipStatus !== 0 || createdEmail === emailAddress;
+  // const invoiceBtnPermissions = +ipStatus !== 0 || createdEmail === emailAddress;
   const orderData: OrderData[] = [
     {
       header: b3Lang('orderDetail.summary'),
@@ -395,32 +477,31 @@ export default function OrderAction(props: OrderActionProps) {
         dateCreateAt && name
           ? b3Lang('orderDetail.purchaseDetails', {
               name,
-              updatedAt: displayFormat(+dateCreateAt),
+              updatedAt: displayFormat(Number(dateCreateAt)),
             })
           : '',
       buttons,
       infos: {
         money,
         info: priceData || {},
+        symbol: priceSymbol || {},
       },
     },
     {
       header: b3Lang('orderDetail.payment'),
       key: 'payment',
-      subtitle: createAt
-        ? b3Lang('orderDetail.paidInFull', {
-            paidDate: displayFormat(createAt, true),
-          })
-        : '',
+      subtitle: getPaymentMessage(),
       buttons: [
         {
           value: isB2BUser ? b3Lang('orderDetail.viewInvoice') : b3Lang('orderDetail.printInvoice'),
           key: 'aboutInvoice',
           name: isB2BUser ? 'viewInvoice' : 'printInvoice',
           variant: 'outlined',
-          isCanShow: isB2BUser
-            ? invoiceBtnPermissions && getInvoicesPermission
-            : invoiceBtnPermissions,
+          // isCanShow: isB2BUser
+          //   ? invoiceBtnPermissions && invoiceBtnPermissions
+          //   : invoiceBtnPermissions,
+          // hidden ao 08/12/24 until needed
+          isCanShow: false,
         },
       ],
       infos: {
@@ -451,6 +532,8 @@ export default function OrderAction(props: OrderActionProps) {
             ipStatus={ipStatus}
             invoiceId={invoiceId}
             key={item.key}
+            isCurrentCompany={isCurrentCompany}
+            switchCompanyId={companyId}
           />
         ))}
     </OrderActionContainer>

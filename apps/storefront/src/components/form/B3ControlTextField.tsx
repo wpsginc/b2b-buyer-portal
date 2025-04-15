@@ -36,6 +36,7 @@ export default function B3ControlTextField({ control, errors, ...rest }: Form.B3
     fieldId,
     isEnterTrigger,
     handleEnterClick,
+    pattern,
   } = rest;
 
   const b3Lang = useB3Lang();
@@ -79,6 +80,7 @@ export default function B3ControlTextField({ control, errors, ...rest }: Form.B3
     maxLength,
     minLength,
     readOnly,
+    pattern,
   };
 
   const muiAttributeProps = muiTextFieldProps
@@ -104,6 +106,47 @@ export default function B3ControlTextField({ control, errors, ...rest }: Form.B3
       event.preventDefault();
     }
   }, 300);
+
+  const handleListrak = debounce((event) => {
+    const target = event.target as HTMLTextAreaElement;
+    if (target?.value) {
+      window.parent.postMessage(target?.value, '*');
+    }
+  }, 500);
+
+  // remove debounce to validate string upon enter
+  const validateNumberField = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (fieldId?.includes('phone_number') || label?.includes('Phone Number')) {
+      const allowedKeys = [
+        'Digit0',
+        'Digit1',
+        'Digit2',
+        'Digit3',
+        'Digit4',
+        'Digit5',
+        'Digit6',
+        'Digit7',
+        'Digit8',
+        'Digit9',
+        'Enter',
+        'Digit0',
+        'Numpad0',
+        'Numpad1',
+        'Numpad2',
+        'Numpad3',
+        'Numpad4',
+        'Numpad5',
+        'Numpad6',
+        'Numpad7',
+        'Numpad8',
+        'Numpad9',
+        'Backspace',
+      ];
+      if (allowedKeys.indexOf(event.code) < 0) {
+        event.preventDefault();
+      }
+    }
+  };
 
   const handleNumberInputWheel = (event: WheelEvent<HTMLInputElement>) => {
     (event.target as HTMLElement).blur();
@@ -170,7 +213,8 @@ export default function B3ControlTextField({ control, errors, ...rest }: Form.B3
               inputProps={muiAttributeProps}
               error={!!errors[name]}
               helperText={(errors as any)[name] ? (errors as any)[name].message : null}
-              onKeyDown={isEnterTrigger ? handleKeyDown : () => {}}
+              onKeyDown={isEnterTrigger ? handleKeyDown : validateNumberField}
+              onBlur={handleListrak}
               {...autoCompleteFn()}
             />
           )

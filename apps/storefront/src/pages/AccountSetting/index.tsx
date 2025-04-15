@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
@@ -13,27 +13,70 @@ import { useMobile } from '@/hooks';
 import useStorageState from '@/hooks/useStorageState';
 import { CustomStyleContext } from '@/shared/customStyleButton';
 import {
+  checkUserBCEmail,
+  checkUserEmail,
   getB2BAccountFormFields,
   getB2BAccountSettings,
   getBCAccountSettings,
   updateB2BAccountSettings,
   updateBCAccountSettings,
 } from '@/shared/service/b2b';
-import { isB2BUserSelector, isValidUserTypeSelector, useAppSelector } from '@/store';
+import { isB2BUserSelector, useAppSelector } from '@/store';
 import { Fields, ParamProps } from '@/types/accountSetting';
-import { B3SStorage, snackbar } from '@/utils';
+import { B3SStorage, channelId, snackbar } from '@/utils';
 
 import { deCodeField, getAccountFormFields } from '../Registered/config';
 
-import { getAccountSettingFiles } from './config';
-import sendEmail, {
-  b2bSubmitDataProcessing,
-  bcSubmitDataProcessing,
-  initB2BInfo,
-  initBcInfo,
-} from './utils';
+import { getAccountSettingsFields, getPasswordModifiedFields } from './config';
+import { b2bSubmitDataProcessing, bcSubmitDataProcessing, initB2BInfo, initBcInfo } from './utils';
+
+function useData() {
+  const isB2BUser = useAppSelector(isB2BUserSelector);
+  const companyInfoId = useAppSelector(({ company }) => company.companyInfo.id);
+  const customer = useAppSelector(({ company }) => company.customer);
+  const role = useAppSelector(({ company }) => company.customer.role);
+  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
+  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
+  const companyId = role === 3 && isAgenting ? Number(salesRepCompanyId) : Number(companyInfoId);
+  const isBCUser = !isB2BUser || (role === 3 && !isAgenting);
+
+  const validateEmailValue = async (emailValue: string) => {
+    if (customer.emailAddress === trim(emailValue)) return true;
+    const payload = {
+      email: emailValue,
+      channelId,
+    };
+
+    const { isValid }: { isValid: boolean } = isBCUser
+      ? await checkUserBCEmail(payload)
+      : await checkUserEmail(payload);
+
+    return isValid;
+  };
+
+  const emailValidation = (data: Partial<ParamProps>) => {
+    if (data.email !== customer.emailAddress && !data.currentPassword) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const passwordValidation = (data: Partial<ParamProps>) => {
+    if (data.password !== data.confirmPassword) {
+      return false;
+    }
+
+    return true;
+  };
+
+  return { isBCUser, companyId, customer, validateEmailValue, emailValidation, passwordValidation };
+}
 
 function AccountSetting() {
+  const { isBCUser, companyId, customer, validateEmailValue, emailValidation, passwordValidation } =
+    useData();
+
   const {
     control,
     handleSubmit,
@@ -45,18 +88,11 @@ function AccountSetting() {
     mode: 'onSubmit',
   });
 
-  const [isFinshUpdate, setIsFinshUpdate] = useStorageState<boolean>(
-    'sf-isFinshUpdate',
+  const [isFinishUpdate, setIsFinishUpdate] = useStorageState<boolean>(
+    'sf-isFinishUpdate',
     false,
     sessionStorage,
   );
-  const isB2BUser = useAppSelector(isB2BUserSelector);
-  const companyInfoId = useAppSelector(({ company }) => company.companyInfo.id);
-  const customer = useAppSelector(({ company }) => company.customer);
-  const role = useAppSelector(({ company }) => company.customer.role);
-  const isValidUserType = useAppSelector(isValidUserTypeSelector);
-  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
-  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
 
   const {
     state: {
@@ -71,92 +107,52 @@ function AccountSetting() {
   const navigate = useNavigate();
 
   const [accountInfoFormFields, setAccountInfoFormFields] = useState<Partial<Fields>[]>([]);
-
   const [decryptionFields, setDecryptionFields] = useState<Partial<Fields>[]>([]);
-
   const [extraFields, setExtraFields] = useState<Partial<Fields>[]>([]);
-
-  const [isloadding, setLoadding] = useState<boolean>(false);
-
+  const [isLoading, setLoading] = useState<boolean>(false);
   const [accountSettings, setAccountSettings] = useState<any>({});
-
   const [isVisible, setIsVisible] = useState<boolean>(false);
-
-  const [currentEamil, setCurrentEmail] = useState<string>('');
-
-  const companyId = role === 3 && isAgenting ? salesRepCompanyId : +companyInfoId;
-
-  const isBCUser = !isB2BUser || (role === 3 && !isAgenting);
 
   useEffect(() => {
     const init = async () => {
       try {
-        setLoadding(true);
+        setLoading(true);
+
+        const fn = isBCUser ? getBCAccountSettings : getB2BAccountSettings;
+
+        const params = isBCUser
+          ? {}
+          : {
+              companyId,
+            };
+
+        const key = isBCUser ? 'customerAccountSettings' : 'accountSettings';
 
         const accountFormAllFields = await getB2BAccountFormFields(isBCUser ? 1 : 2);
-
-        const fn = !isBCUser ? getB2BAccountSettings : getBCAccountSettings;
-
-        const params = !isBCUser
-          ? {
-              companyId,
-            }
-          : {};
-
-        const key = !isBCUser ? 'accountSettings' : 'customerAccountSettings';
-
-        const { [key]: accountSettings } = await fn(params);
-
         const accountFormFields = getAccountFormFields(
           accountFormAllFields.accountFormFields || [],
         );
-        const { accountB2BFormFields, passwordModified } = getAccountSettingFiles(12, b3Lang);
 
         const contactInformation = (accountFormFields?.contactInformation || []).filter(
           (item: Partial<Fields>) => item.fieldId !== 'field_email_marketing_newsletter',
         );
 
-        const contactInformationTranslatedLabels = JSON.parse(JSON.stringify(contactInformation));
-
-        contactInformationTranslatedLabels.forEach(
-          (element: { fieldId: string; label: string }) => {
-            const currentElement = element;
-            if (currentElement.fieldId === 'field_first_name') {
-              currentElement.label = b3Lang('accountSettings.form.firstName');
-            }
-            if (currentElement.fieldId === 'field_last_name') {
-              currentElement.label = b3Lang('accountSettings.form.lastName');
-            }
-            if (currentElement.fieldId === 'field_email') {
-              currentElement.label = b3Lang('accountSettings.form.email');
-            }
-            if (currentElement.fieldId === 'field_phone_number') {
-              currentElement.label = b3Lang('accountSettings.form.phoneNumber');
-            }
-          },
-        );
-
         const { additionalInformation = [] } = accountFormFields;
 
-        const fields = !isBCUser
-          ? initB2BInfo(
+        const { [key]: accountSettings } = await fn(params);
+
+        const fields = isBCUser
+          ? initBcInfo(accountSettings, contactInformation, additionalInformation)
+          : initB2BInfo(
               accountSettings,
-              contactInformationTranslatedLabels,
-              accountB2BFormFields,
+              contactInformation,
+              getAccountSettingsFields(),
               additionalInformation,
-            )
-          : initBcInfo(accountSettings, contactInformationTranslatedLabels, additionalInformation);
+            );
 
-        const passwordModifiedTranslatedFields = JSON.parse(JSON.stringify(passwordModified)).map(
-          (element: { label: string; idLang: string }) => {
-            const passwordField = element;
-            passwordField.label = b3Lang(element.idLang);
+        const passwordModifiedFields = getPasswordModifiedFields();
 
-            return element;
-          },
-        );
-
-        const all = [...fields, ...passwordModifiedTranslatedFields];
+        const all = [...fields, ...passwordModifiedFields];
 
         const roleItem = all.find((item) => item.name === 'role');
 
@@ -164,19 +160,17 @@ function AccountSetting() {
 
         setAccountInfoFormFields(all);
 
-        setCurrentEmail(accountSettings.email);
-
         setAccountSettings(accountSettings);
 
         setDecryptionFields(contactInformation);
 
         setExtraFields(additionalInformation);
       } finally {
-        if (isFinshUpdate) {
+        if (isFinishUpdate) {
           snackbar.success(b3Lang('accountSettings.notification.detailsUpdated'));
-          setIsFinshUpdate(false);
+          setIsFinishUpdate(false);
         }
-        setLoadding(false);
+        setLoading(false);
         setIsVisible(true);
       }
     };
@@ -186,134 +180,118 @@ function AccountSetting() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const validateEmailValue = async (emailValue: string) => {
-    if (customer.emailAddress === trim(emailValue)) return true;
-
-    if (!isValidUserType) {
-      setError('email', {
-        type: 'custom',
-        message: b3Lang('accountSettings.notification.emailExists'),
-      });
-    }
-
-    return isValidUserType;
-  };
-
-  const passwordValidation = (data: Partial<ParamProps>) => {
-    if (data.password !== data.confirmPassword) {
-      setError('confirmPassword', {
-        type: 'manual',
-        message: b3Lang('global.registerComplete.passwordMatchPrompt'),
-      });
-      setError('password', {
-        type: 'manual',
-        message: b3Lang('global.registerComplete.passwordMatchPrompt'),
-      });
-      return false;
-    }
-
-    return true;
-  };
-
-  const emailValidation = (data: Partial<ParamProps>) => {
-    if (data.email !== customer.emailAddress && !data.currentPassword) {
-      snackbar.error(b3Lang('accountSettings.notification.updateEmailPassword'));
-      return false;
-    }
-    return true;
-  };
-
-  const handleGetUserExtraFields = (data: CustomFieldItems) => {
-    let userExtraFieldsInfo: CustomFieldItems[] = [];
+  const handleGetUserExtraFields = (
+    data: CustomFieldItems,
+    accountInfoFormFields: Partial<Fields>[],
+  ) => {
     const userExtraFields = accountInfoFormFields.filter(
       (item: CustomFieldItems) => item.custom && item.groupId === 1,
     );
-    if (userExtraFields.length > 0) {
-      userExtraFieldsInfo = userExtraFields.map((item: CustomFieldItems) => ({
-        fieldName: deCodeField(item?.name || ''),
-        fieldValue: data[item.name],
-      }));
-    }
-
-    return userExtraFieldsInfo;
+    return userExtraFields.map((item: CustomFieldItems) => ({
+      fieldName: deCodeField(item?.name || ''),
+      fieldValue: data[item.name],
+    }));
   };
 
   const handleAddUserClick = () => {
     handleSubmit(async (data: CustomFieldItems) => {
-      setLoadding(true);
+      setLoading(true);
 
       try {
-        const isValid = !isBCUser ? await validateEmailValue(data.email) : true;
+        const isValid = await validateEmailValue(data.email);
+
+        if (!isValid) {
+          setError('email', {
+            type: 'custom',
+            message: b3Lang('accountSettings.notification.emailExists'),
+          });
+        }
 
         const emailFlag = emailValidation(data);
 
-        const passwordFlag = passwordValidation(data);
-
-        let userExtraFields: CustomFieldItems[] = [];
-        if (!isBCUser) {
-          userExtraFields = handleGetUserExtraFields(data);
+        if (!emailFlag) {
+          snackbar.error(b3Lang('accountSettings.notification.updateEmailPassword'));
         }
 
-        const dataProcessingFn = !isBCUser ? b2bSubmitDataProcessing : bcSubmitDataProcessing;
+        const passwordFlag = passwordValidation(data);
+
+        if (!passwordFlag) {
+          setError('confirmPassword', {
+            type: 'manual',
+            message: b3Lang('global.registerComplete.passwordMatchPrompt'),
+          });
+          setError('password', {
+            type: 'manual',
+            message: b3Lang('global.registerComplete.passwordMatchPrompt'),
+          });
+        }
 
         if (isValid && emailFlag && passwordFlag) {
-          const { isEdit, param } = dataProcessingFn(
-            data,
-            accountSettings,
-            decryptionFields,
-            extraFields,
-          );
+          const dataProcessingFn = isBCUser ? bcSubmitDataProcessing : b2bSubmitDataProcessing;
+          const payload = dataProcessingFn(data, accountSettings, decryptionFields, extraFields);
 
-          if (isEdit) {
+          if (payload) {
             if (!isBCUser) {
-              param.companyId = companyId;
-              param.extraFields = userExtraFields;
+              payload.companyId = companyId;
+              payload.extraFields = handleGetUserExtraFields(data, accountInfoFormFields);
             }
 
-            const requestFn = !isBCUser ? updateB2BAccountSettings : updateBCAccountSettings;
-
-            if ((param.newPassword && param.currentPassword) || currentEamil !== param.email) {
-              const isUpdateSuccessfully = await sendEmail(param, extraFields);
-              if (!isUpdateSuccessfully) {
-                snackbar.error(b3Lang('accountSettings.notification.passwordNotMatch'));
-                return;
-              }
+            if (payload.newPassword === '' && payload.confirmPassword === '') {
+              delete payload.newPassword;
+              delete payload.confirmPassword;
             }
-            const newParams = {
-              ...param,
-              newPassword: param.newPassword,
-              currentPassword: param.newPassword,
-              confirmPassword: param.newPassword,
-            };
-            await requestFn(newParams);
-          } else {
+          }
+
+          if (!payload) {
             snackbar.success(b3Lang('accountSettings.notification.noEdits'));
             return;
           }
+
+          const requestFn = isBCUser ? updateBCAccountSettings : updateB2BAccountSettings;
+          await requestFn(payload);
 
           if (
             (data.password && data.currentPassword) ||
             customer.emailAddress !== trim(data.email)
           ) {
-            navigate('/login?loginFlag=3');
+            navigate('/login?loginFlag=loggedOutLogin');
           } else {
             B3SStorage.clear();
-            setIsFinshUpdate(true);
+            setIsFinishUpdate(true);
             window.location.reload();
           }
         }
       } finally {
-        setLoadding(false);
+        setLoading(false);
       }
     })();
   };
 
+  const translatedFields = useMemo(() => {
+    const fieldTranslations: Record<string, string> = {
+      field_first_name: b3Lang('accountSettings.form.firstName'),
+      field_last_name: b3Lang('accountSettings.form.lastName'),
+      field_email: b3Lang('accountSettings.form.email'),
+      field_phone_number: b3Lang('accountSettings.form.phoneNumber'),
+      field_company: b3Lang('accountSettings.form.company'),
+      field_role: b3Lang('accountSettings.form.role'),
+      field_current_password: b3Lang('accountSettings.form.currentPassword'),
+      field_password: b3Lang('accountSettings.form.password'),
+      field_confirm_password: b3Lang('accountSettings.form.confirmPassword'),
+    };
+
+    return accountInfoFormFields.map((item) => ({
+      ...item,
+      label: fieldTranslations[item.fieldId ?? ''] ?? item.label,
+    }));
+  }, [accountInfoFormFields, b3Lang]);
+
   return (
-    <B3Spin isSpinning={isloadding} background={backgroundColor}>
+    <B3Spin isSpinning={isLoading} background={backgroundColor}>
       <Box
         sx={{
-          width: `${isMobile ? '100%' : '35%'}`,
-          minHeight: `${isMobile ? '800px' : '300px'}`,
+          width: isMobile ? '100%' : '35%',
+          minHeight: isMobile ? '800px' : '300px',
           '& input, & .MuiFormControl-root .MuiTextField-root, & .MuiSelect-select.MuiSelect-filled, & .MuiTextField-root .MuiInputBase-multiline':
             {
               bgcolor: b3HexToRgb('#FFFFFF', 0.87),
@@ -335,7 +313,7 @@ function AccountSetting() {
         }}
       >
         <B3CustomForm
-          formFields={accountInfoFormFields}
+          formFields={translatedFields}
           errors={errors}
           control={control}
           getValues={getValues}
@@ -345,9 +323,9 @@ function AccountSetting() {
         <CustomButton
           sx={{
             mt: '28px',
-            mb: `${isMobile ? '20px' : '0'}`,
+            mb: isMobile ? '20px' : '0',
             width: '100%',
-            visibility: `${isVisible ? 'visible' : 'hidden'}`,
+            visibility: isVisible ? 'visible' : 'hidden',
           }}
           onClick={handleAddUserClick}
           variant="contained"

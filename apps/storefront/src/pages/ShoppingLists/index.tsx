@@ -5,9 +5,9 @@ import { Box } from '@mui/material';
 import B3Dialog from '@/components/B3Dialog';
 import B3Filter from '@/components/filter/B3Filter';
 import B3Spin from '@/components/spin/B3Spin';
-import { B3PaginationTable } from '@/components/table/B3PaginationTable';
+import { B3PaginationTable, GetRequestList } from '@/components/table/B3PaginationTable';
 import { useCardListColumn, useMobile, useTableRef } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   deleteB2BShoppingList,
   deleteBcShoppingList,
@@ -16,71 +16,70 @@ import {
   getShoppingListsCreatedByUser,
 } from '@/shared/service/b2b';
 import { isB2BUserSelector, rolePermissionSelector, useAppSelector } from '@/store';
+import { ShoppingListStatus } from '@/types/shoppingList';
 import { channelId, snackbar } from '@/utils';
 
 import AddEditShoppingLists from './AddEditShoppingLists';
-import { getFilterMoreList, ShoppingListSearch, ShoppingListsItemsProps } from './config';
+import { ShoppingListSearch, ShoppingListsItemsProps, useGetFilterMoreList } from './config';
 import ShoppingListsCard from './ShoppingListsCard';
 
-interface RefCurrntProps extends HTMLInputElement {
+interface RefCurrentProps extends HTMLInputElement {
   handleOpenAddEditShoppingListsClick: (type: string, data?: ShoppingListsItemsProps) => void;
+}
+
+function useData() {
+  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
+  const isB2BUser = useAppSelector(isB2BUserSelector);
+  const companyB2BId = useAppSelector(({ company }) => company.companyInfo.id);
+  const { shoppingListCreateActionsPermission, submitShoppingListPermission } =
+    useAppSelector(rolePermissionSelector);
+  const companyId = companyB2BId || salesRepCompanyId;
+
+  const deleteShoppingList = isB2BUser ? deleteB2BShoppingList : deleteBcShoppingList;
+
+  const getUserShoppingLists = isB2BUser
+    ? () => getShoppingListsCreatedByUser(Number(companyId), 1)
+    : () => Promise.resolve({});
+
+  return {
+    isB2BUser,
+    shoppingListCreateActionsPermission,
+    submitShoppingListPermission,
+    deleteShoppingList,
+    getUserShoppingLists,
+  };
 }
 
 function ShoppingLists() {
   const [isRequestLoading, setIsRequestLoading] = useState<boolean>(false);
-
   const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
-
   const [deleteItem, setDeleteItem] = useState<null | ShoppingListsItemsProps>(null);
-
-  const [fiterMoreInfo, setFiterMoreinfo] = useState<Array<any>>([]);
+  const [filterMoreInfo, setFilterMoreInfo] = useState<Array<any>>([]);
+  const getFilterMoreList = useGetFilterMoreList();
 
   const [isMobile] = useMobile();
+  const b3Lang = useB3Lang();
 
   const [paginationTableRef] = useTableRef();
 
-  const b3Lang = useB3Lang();
-
-  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
+  const {
+    isB2BUser,
+    shoppingListCreateActionsPermission,
+    submitShoppingListPermission,
+    deleteShoppingList,
+    getUserShoppingLists,
+  } = useData();
 
   const {
     state: { openAPPParams },
     dispatch,
-  } = useContext(GlobaledContext);
-
-  const isB2BUser = useAppSelector(isB2BUserSelector);
-  const companyB2BId = useAppSelector(({ company }) => company.companyInfo.id);
-
-  const { shoppingListActionsPermission, submitShoppingListPermission } =
-    useAppSelector(rolePermissionSelector);
+  } = useContext(GlobalContext);
 
   useEffect(() => {
     const initFilter = async () => {
-      const companyId = companyB2BId || salesRepCompanyId;
-      let createdByUsers: CustomFieldItems = {};
-      if (isB2BUser) createdByUsers = await getShoppingListsCreatedByUser(+companyId, 1);
-
-      const filterInfo = getFilterMoreList(createdByUsers, submitShoppingListPermission);
-
-      const translatedFilterInfo = JSON.parse(JSON.stringify(filterInfo));
-
-      translatedFilterInfo.forEach(
-        (element: { label: string; idLang: any; name: string; options: any[] }) => {
-          const translatedInfo = element;
-          translatedInfo.label = b3Lang(element.idLang);
-          if (element.name === 'status') {
-            element.options?.map((option) => {
-              const elementOption = option;
-              elementOption.label = b3Lang(option.idLang);
-              return option;
-            });
-          }
-
-          return element;
-        },
+      setFilterMoreInfo(
+        getFilterMoreList(submitShoppingListPermission, await getUserShoppingLists()),
       );
-
-      setFiterMoreinfo(translatedFilterInfo);
     };
 
     initFilter();
@@ -103,16 +102,18 @@ function ShoppingLists() {
   const isExtraLarge = useCardListColumn();
 
   const customItem = {
-    isEnabled: isB2BUser ? shoppingListActionsPermission : true,
+    isEnabled: isB2BUser ? shoppingListCreateActionsPermission : true,
     customLabel: b3Lang('shoppingLists.createNew'),
-    customButtomStyle: {
+    customButtonStyle: {
       fontSize: '15px',
       fontWeight: '500',
       width: '140px',
       padding: '0',
     },
   };
-  const statusPermissions = !submitShoppingListPermission ? [0, 40] : '';
+  const statusPermissions = !submitShoppingListPermission
+    ? [ShoppingListStatus.Approved, ShoppingListStatus.ReadyForApproval]
+    : '';
 
   const initSearch = {
     search: '',
@@ -123,7 +124,7 @@ function ShoppingLists() {
 
   const [filterSearch, setFilterSearch] = useState<ShoppingListSearch>(initSearch);
 
-  const addEditShoppingListsRef = useRef<RefCurrntProps | null>(null);
+  const addEditShoppingListsRef = useRef<RefCurrentProps | null>(null);
 
   const initSearchList = () => {
     paginationTableRef.current?.refresh();
@@ -140,7 +141,7 @@ function ShoppingLists() {
     }
   };
 
-  const handleFirterChange = (data: ShoppingListSearch) => {
+  const handleFilterChange = (data: ShoppingListSearch) => {
     const { status } = data;
 
     const getNewStatus = status === '' || status === 99 ? statusPermissions : status;
@@ -154,7 +155,7 @@ function ShoppingLists() {
     setFilterSearch(search);
   };
 
-  const fetchList = async (params: ShoppingListSearch) => {
+  const fetchList: GetRequestList<ShoppingListSearch, ShoppingListsItemsProps> = async (params) => {
     const { edges, totalCount } = isB2BUser
       ? await getB2BShoppingList(params)
       : await getBcShoppingList({
@@ -196,13 +197,8 @@ function ShoppingLists() {
     try {
       setIsRequestLoading(true);
       handleCancelClick();
-      const id: number = deleteItem?.id || 0;
 
-      if (isB2BUser) {
-        await deleteB2BShoppingList(id);
-      } else {
-        await deleteBcShoppingList(id);
-      }
+      await deleteShoppingList(deleteItem?.id || 0);
 
       snackbar.success(b3Lang('shoppingLists.deleteSuccess'));
     } finally {
@@ -222,11 +218,11 @@ function ShoppingLists() {
       >
         <B3Filter
           showB3FilterMoreIcon={isB2BUser}
-          fiterMoreInfo={fiterMoreInfo}
+          filterMoreInfo={filterMoreInfo}
           handleChange={handleChange}
-          handleFilterChange={handleFirterChange}
-          customButtomConfig={customItem}
-          handleFilterCustomButtomClick={handleAddShoppingListsClick}
+          handleFilterChange={handleFilterChange}
+          customButtonConfig={customItem}
+          handleFilterCustomButtonClick={handleAddShoppingListsClick}
         />
         <B3PaginationTable
           columnItems={[]}
@@ -237,11 +233,11 @@ function ShoppingLists() {
           isCustomRender
           itemXs={isExtraLarge ? 3 : 4}
           requestLoading={setIsRequestLoading}
-          renderItem={(row: ShoppingListsItemsProps) => (
+          renderItem={(row) => (
             <ShoppingListsCard
               key={row.id || ''}
               item={row}
-              isPermissions={isB2BUser ? shoppingListActionsPermission : true}
+              isPermissions={isB2BUser ? shoppingListCreateActionsPermission : true}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onCopy={handleCopy}
@@ -270,8 +266,7 @@ function ShoppingLists() {
           <Box
             sx={{
               display: 'flex',
-              justifyContent: `${isMobile ? 'center%' : 'start'}`,
-              width: `${isMobile ? '100%' : '450px'}`,
+              width: isMobile ? '100%' : '450px',
               height: '100%',
             }}
           >

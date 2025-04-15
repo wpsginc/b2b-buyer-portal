@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FieldValues, useForm } from 'react-hook-form';
 import { useB3Lang } from '@b3/lang';
 import { Box, Typography } from '@mui/material';
@@ -15,13 +15,12 @@ import {
   getBcVariantInfoBySkus,
 } from '@/shared/service/b2b';
 import { isB2BUserSelector, useAppSelector } from '@/store';
-import { baseUrl, snackbar } from '@/utils';
+import { BigCommerceStorefrontAPIBaseURL, snackbar } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 import b3TriggerCartNumber from '@/utils/b3TriggerCartNumber';
 import { callCart } from '@/utils/cartUtils';
 
 import { EditableProductItem, OrderProductItem } from '../../../types';
-import { OrderDetailsContext } from '../context/OrderDetailsContext';
 import getReturnFormFields from '../shared/config';
 
 import CreateShoppingList from './CreateShoppingList';
@@ -75,10 +74,6 @@ export default function OrderDialog({
   orderId,
 }: OrderDialogProps) {
   const isB2BUser = useAppSelector(isB2BUserSelector);
-  const {
-    state: { variantImages = [] },
-  } = useContext(OrderDetailsContext);
-
   const [isOpenCreateShopping, setOpenCreateShopping] = useState(false);
   const [openShoppingList, setOpenShoppingList] = useState(false);
   const [editableProducts, setEditableProducts] = useState<EditableProductItem[]>([]);
@@ -131,7 +126,7 @@ export default function OrderDialog({
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
       },
-      referrer: `${baseUrl}/account.php?action=new_return&order_id=${orderId}`,
+      referrer: `${BigCommerceStorefrontAPIBaseURL}/account.php?action=new_return&order_id=${orderId}`,
       body: urlencoded,
       mode: 'no-cors',
     };
@@ -139,7 +134,7 @@ export default function OrderDialog({
     try {
       setIsRequestLoading(true);
       const returnResult = await fetch(
-        `${baseUrl}/account.php?action=save_new_return`,
+        `${BigCommerceStorefrontAPIBaseURL}/account.php?action=save_new_return`,
         requestOptions,
       );
       if (returnResult.status === 200 && returnResult.url.includes('saved_new_return')) {
@@ -254,10 +249,17 @@ export default function OrderDialog({
           isClose: true,
         });
       }
-    } catch (err: any) {
-      snackbar.error(err?.detail, {
-        isClose: true,
-      });
+    } catch (err) {
+      if (err instanceof Error) {
+        snackbar.error(err.message, {
+          isClose: true,
+        });
+      } else if (typeof err === 'object' && err !== null && 'detail' in err) {
+        const customError = err as { detail: string };
+        snackbar.error(customError.detail, {
+          isClose: true,
+        });
+      }
     } finally {
       setIsRequestLoading(false);
     }
@@ -306,9 +308,9 @@ export default function OrderDialog({
         } = product;
 
         return {
-          productId: +productId,
+          productId: Number(productId),
           variantId,
-          quantity: +editQuantity,
+          quantity: Number(editQuantity),
           optionList: productOptions.map((option) => {
             const { product_option_id: optionId, value: optionValue } = option;
 
@@ -319,12 +321,12 @@ export default function OrderDialog({
           }),
         };
       });
-      const params = items.filter((item) => checkedArr.includes(+item.variantId));
+      const params = items.filter((item) => checkedArr.includes(Number(item.variantId)));
 
       const addToShoppingList = isB2BUser ? addProductToShoppingList : addProductToBcShoppingList;
 
       await addToShoppingList({
-        shoppingListId: +id,
+        shoppingListId: Number(id),
         items: params,
       });
 
@@ -356,31 +358,30 @@ export default function OrderDialog({
   useEffect(() => {
     if (!open) return;
     setEditableProducts(
-      products.map((item: OrderProductItem) => {
-        const currentVariant = variantImages.find(
-          (variant) => item.sku === variant?.variantSku || +item.variant_id === +variant.variantId,
-        );
-
-        return {
-          ...item,
-          editQuantity: item.quantity,
-          imageUrl: currentVariant?.variantImage || item.imageUrl,
-        };
-      }),
+      products.map((item: OrderProductItem) => ({
+        ...item,
+        editQuantity: item.quantity,
+      })),
     );
 
     const getVariantInfoByList = async () => {
-      const skus = products.map((product) => product.sku);
+      const visibleProducts = products.filter((item: OrderProductItem) => item?.isVisible);
 
+      const visibleSkus = visibleProducts.map((product) => product.sku);
+
+      if (visibleSkus.length === 0) return;
+      const params = {
+        skus: visibleSkus,
+      };
       const { variantSku: variantInfoList = [] } = isB2BUser
-        ? await getB2BVariantInfoBySkus({ skus })
-        : await getBcVariantInfoBySkus({ skus });
+        ? await getB2BVariantInfoBySkus(params)
+        : await getBcVariantInfoBySkus(params);
 
       setVariantInfoList(variantInfoList);
     };
 
     getVariantInfoByList();
-  }, [isB2BUser, open, products, variantImages]);
+  }, [isB2BUser, open, products]);
 
   const handleProductChange = (products: EditableProductItem[]) => {
     setEditableProducts(products);
@@ -429,7 +430,7 @@ export default function OrderDialog({
                   margin: '20px 0',
                 }}
               >
-                {b3Lang('purchasedProducts.orderDialog.aditionalInformation')}
+                {b3Lang('purchasedProducts.orderDialog.additionalInformation')}
               </Typography>
               <B3CustomForm
                 formFields={returnFormFields}

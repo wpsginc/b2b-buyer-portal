@@ -1,4 +1,5 @@
-import globalB3 from '@b3/global-b3';
+import config from '@b3/global-b3';
+import { LangFormatFunction } from '@b3/lang';
 
 import B3AddToQuoteTip from '@/components/B3AddToQuoteTip';
 import { type SetOpenPage } from '@/pages/SetOpenPage';
@@ -13,6 +14,7 @@ import {
   addQuoteDraftProducts,
   calculateProductsPrice,
   getCalculatedProductPrice,
+  getVariantInfoOOSAndPurchase,
   LineItems,
   validProductQty,
 } from '@/utils/b3Product/b3Product';
@@ -108,7 +110,7 @@ interface CartInfoProps {
   updatedTime: string;
 }
 
-const addLoadding = (b3CartToQuote: any) => {
+const addLoading = (b3CartToQuote: any) => {
   const loadingDiv = document.createElement('div');
   loadingDiv.setAttribute('id', 'b2b-div-loading');
   const loadingBtn = document.createElement('div');
@@ -124,7 +126,7 @@ const removeElement = (_element: CustomFieldItems) => {
   }
 };
 
-const removeLoadding = () => {
+const removeLoading = () => {
   const b2bLoading = document.querySelector('#b2b-div-loading');
   if (b2bLoading) removeElement(b2bLoading);
 };
@@ -170,7 +172,12 @@ const addProductsToDraftQuote = async (
 ) => {
   // filter products with SKU
   const productsWithSKUOrVariantId = products.filter(
-    ({ sku, variantEntityId }) => sku || variantEntityId,
+    ({ sku, variantEntityId, productEntityId }) => {
+      const validId =
+        !Number.isNaN(Number(variantEntityId)) || !Number.isNaN(Number(productEntityId));
+
+      return sku || validId;
+    },
   );
 
   const companyInfoId = store.getState().company.companyInfo.id;
@@ -183,7 +190,7 @@ const addProductsToDraftQuote = async (
   // fetch data with products IDs
   const { productsSearch } = await searchB2BProducts({
     productIds: Array.from(
-      new Set(productsWithSKUOrVariantId.map(({ productEntityId }) => +productEntityId)),
+      new Set(productsWithSKUOrVariantId.map(({ productEntityId }) => Number(productEntityId))),
     ),
     currencyCode,
     companyId,
@@ -225,10 +232,8 @@ const addProductsToDraftQuote = async (
 };
 
 const addProductsFromCartToQuote = (setOpenPage: SetOpenPage) => {
-  const addToQuote = async () => {
+  const addToQuote = async (cartInfoWithOptions: CartInfoProps | any) => {
     try {
-      const cartInfoWithOptions: CartInfoProps | any = await getCart();
-
       if (!cartInfoWithOptions.data.site.cart) {
         globalSnackbar.error('No products in Cart.', {
           isClose: true,
@@ -260,20 +265,28 @@ const addProductsFromCartToQuote = (setOpenPage: SetOpenPage) => {
     } catch (e) {
       b2bLogger.error(e);
     } finally {
-      removeLoadding();
+      removeLoading();
     }
   };
 
+  const addToQuoteFromCookie = () => getCart().then(addToQuote);
+  const addToQuoteFromCart = (cartId: string) => getCart(cartId).then(addToQuote);
+
   return {
-    addToQuote,
-    addLoadding,
+    addToQuoteFromCookie,
+    addToQuoteFromCart,
+    addLoading,
   };
 };
 
-const addProductFromProductPageToQuote = (setOpenPage: SetOpenPage) => {
+const addProductFromProductPageToQuote = (
+  setOpenPage: SetOpenPage,
+  isEnableProduct: boolean,
+  b3Lang: LangFormatFunction,
+) => {
   const addToQuote = async (role: string | number, node?: HTMLElement) => {
     try {
-      const productView = node ? node.closest(globalB3['dom.productView']) : document;
+      const productView = node ? node.closest(config['dom.productView']) : document;
       if (!productView) return;
       const productId = (productView.querySelector('input[name=product_id]') as CustomFieldItems)
         ?.value;
@@ -291,12 +304,12 @@ const addProductFromProductPageToQuote = (setOpenPage: SetOpenPage) => {
       const companyInfoId = store.getState().company.companyInfo.id;
       const companyId = companyInfoId || B3SStorage.get('salesRepCompanyId');
       const { customerGroupId } = store.getState().company.customer;
-      const fn = +role === 99 || +role === 100 ? searchBcProducts : searchB2BProducts;
+      const fn = Number(role) === 99 || Number(role) === 100 ? searchBcProducts : searchB2BProducts;
 
       const { currency_code: currencyCode } = getActiveCurrencyInfo();
 
       const { productsSearch } = await fn({
-        productIds: [+productId],
+        productIds: [Number(productId)],
         companyId,
         customerGroupId,
         currencyCode,
@@ -315,6 +328,39 @@ const addProductFromProductPageToQuote = (setOpenPage: SetOpenPage) => {
           isClose: true,
         });
         return;
+      }
+
+      if (!isEnableProduct) {
+        const currentProduct = getVariantInfoOOSAndPurchase({
+          ...productsSearch[0],
+          quantity: qty,
+          variantSku: sku,
+          productName: productsSearch[0]?.name,
+          productsSearch: productsSearch[0],
+        });
+
+        const inventoryTracking = productsSearch[0]?.inventoryTracking || 'none';
+        let inventoryLevel = productsSearch[0]?.inventoryLevel;
+        if (inventoryTracking === 'variant') {
+          const currentVariant = productsSearch[0]?.variants.find(
+            (variant: CustomFieldItems) => variant.sku === sku,
+          );
+
+          inventoryLevel = currentVariant?.inventory_level;
+        }
+
+        if (currentProduct?.name) {
+          const message =
+            currentProduct.type === 'oos'
+              ? b3Lang('quoteDraft.productPageToQuote.outOfStock', {
+                  name: currentProduct?.name,
+                  qty: inventoryLevel,
+                })
+              : b3Lang('quoteDraft.productPageToQuote.unavailable');
+
+          globalSnackbar.error(message);
+          return;
+        }
       }
 
       const quoteListitem = await getCalculatedProductPrice({
@@ -353,18 +399,18 @@ const addProductFromProductPageToQuote = (setOpenPage: SetOpenPage) => {
     } catch (e) {
       b2bLogger.error(e);
     } finally {
-      removeLoadding();
+      removeLoading();
     }
   };
 
   return {
     addToQuote,
-    addLoadding,
+    addLoading,
   };
 };
 
 export {
-  addLoadding,
+  addLoading,
   addProductFromProductPageToQuote,
   addProductsFromCartToQuote,
   addProductsToDraftQuote,

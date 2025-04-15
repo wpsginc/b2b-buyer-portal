@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useB3Lang } from '@b3/lang';
 import styled from '@emotion/styled';
 import { Alert, Box } from '@mui/material';
 
@@ -23,9 +24,10 @@ const B3StatusNotificationContainer = styled(Box)(() => ({
 
 export default function B3StatusNotification(props: B3StatusNotificationProps) {
   const { title } = props;
+  const dispatch = useAppDispatch();
+  const b3Lang = useB3Lang();
 
   const loginType = useAppSelector(({ company }) => company.customer.loginType);
-  const dispatch = useAppDispatch();
   const role = useAppSelector(({ company }) => company.customer.role);
   const companyStatus = useAppSelector(({ company }) => company.companyInfo.status);
   const blockPendingAccountOrderCreation = B3SStorage.get('blockPendingAccountOrderCreation');
@@ -41,43 +43,43 @@ export default function B3StatusNotification(props: B3StatusNotificationProps) {
   };
 
   const action: CustomFieldItems = {};
-  if (+companyStatus !== 0) {
+  if (Number(companyStatus) !== 0) {
     action.onClose = handleCloseTip;
   }
 
   useEffect(() => {
-    const loginTypeStatus = +companyStatus === 0 ? true : loginType === 1;
+    const loginTypeStatus = Number(companyStatus) === 0 ? true : loginType === 1;
 
     const showTip = role === 100 ? false : loginTypeStatus;
     setIsShow(showTip);
     if (showTip) {
-      if (+companyStatus === 0) {
+      if (Number(companyStatus) === 0) {
         if (blockPendingAccountOrderCreation && blockPendingAccountViewPrice) {
-          setTip(StatusNotifications.pendingOrderingAndViewPriceBlocked);
+          setTip(b3Lang(StatusNotifications.pendingOrderingAndViewPriceBlocked));
         }
 
         if (blockPendingAccountOrderCreation && !blockPendingAccountViewPrice) {
-          setTip(StatusNotifications.pendingOrderingBlocked);
+          setTip(b3Lang(StatusNotifications.pendingOrderingBlocked));
         }
 
         if (!blockPendingAccountOrderCreation && blockPendingAccountViewPrice) {
-          setTip(StatusNotifications.pendingViewPriceBlocked);
+          setTip(b3Lang(StatusNotifications.pendingViewPriceBlocked));
         }
 
         if (!blockPendingAccountOrderCreation && !blockPendingAccountViewPrice) {
-          setTip(StatusNotifications.pendingOrderingNotBlocked);
+          setTip(b3Lang(StatusNotifications.pendingOrderingNotBlocked));
         }
         setType('info');
         setBcColor('#0288D1');
       }
 
-      if (+companyStatus === 1) {
-        setTip(StatusNotifications.approvedTip);
+      if (Number(companyStatus) === 1) {
+        setTip(b3Lang(StatusNotifications.approvedTip));
         setType('success');
         setBcColor('#2E7D32');
       }
 
-      if (+companyStatus === 2) {
+      if (Number(companyStatus) === 2) {
         setTip(StatusNotifications.rejectedTip);
         setType('warning');
         setBcColor('#ED6C02');
@@ -89,6 +91,7 @@ export default function B3StatusNotification(props: B3StatusNotificationProps) {
     companyStatus,
     loginType,
     role,
+    b3Lang,
   ]);
 
   return isShow ? (

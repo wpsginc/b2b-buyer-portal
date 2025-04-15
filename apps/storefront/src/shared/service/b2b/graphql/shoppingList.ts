@@ -1,3 +1,4 @@
+import { ShoppingListStatus } from '@/types/shoppingList';
 import { convertArrayToGraphql, convertObjectToGraphql } from '@/utils';
 
 import B3Request from '../../request/b3Fetch';
@@ -9,10 +10,17 @@ interface ShoppingListParams {
   description: string;
   status: number;
   channelId: number;
+  companyId: number;
 }
 
 const getStatus = (status: any): string => {
   if (typeof status === 'number') {
+    // Status code 20 was previously misused as Rejected in the frontend, which is actually Deleted
+    // Now when we want to fetch rejected shopping lists, we need to fetch deleted ones as well
+    if (status === ShoppingListStatus.Rejected) {
+      return `status: [${ShoppingListStatus.Deleted}, ${ShoppingListStatus.Rejected}]`;
+    }
+
     return `status: ${status}`;
   }
   if (typeof status === 'object') {
@@ -62,7 +70,18 @@ const getShoppingList = ({
         products {
           totalCount,
         }
-        approvedFlag
+        approvedFlag,
+        companyInfo {
+          companyId,
+          companyName,
+          companyAddress,
+          companyCountry,
+          companyState,
+          companyCity,
+          companyZipCode,
+          phoneNumber,
+          bcId,
+        },
       }
     }
   }
@@ -85,6 +104,17 @@ const getShoppingListInfo = `shoppingList {
   totalDiscount,
   totalTax,
   isShowGrandTotal,
+  companyInfo {
+    companyId,
+    companyName,
+    companyAddress,
+    companyCountry,
+    companyState,
+    companyCity,
+    companyZipCode,
+    phoneNumber,
+    bcId,
+  },
 }`;
 
 const updateShoppingList = (
@@ -178,6 +208,17 @@ const getShoppingListDetails = (data: CustomFieldItems) => `{
     channelId,
     channelName,
     approvedFlag,
+    companyInfo {
+      companyId,
+      companyName,
+      companyAddress,
+      companyCountry,
+      companyState,
+      companyCity,
+      companyZipCode,
+      phoneNumber,
+      bcId,
+    },
     products (
       offset: ${data.offset || 0}
       first: ${data.first || 100},
@@ -463,6 +504,7 @@ export const createB2BShoppingList = (data: Partial<ShoppingListParams>) =>
     query: createShoppingList('shoppingListsCreate'),
     variables: {
       shoppingListData: {
+        companyId: data.companyId,
         name: data.name,
         description: data.description,
         status: data.status,
@@ -474,7 +516,7 @@ export const updateB2BShoppingList = (data: Partial<ShoppingListParams>) =>
   B3Request.graphqlB2B({
     query: updateShoppingList('shoppingListsUpdate'),
     variables: {
-      id: data?.id ? +data.id : 1,
+      id: data?.id ? Number(data.id) : 1,
       shoppingListData: {
         name: data.name,
         description: data.description,
@@ -487,7 +529,7 @@ export const duplicateB2BShoppingList = (data: Partial<ShoppingListParams>) =>
   B3Request.graphqlB2B({
     query: duplicateShoppingList('shoppingListsDuplicate'),
     variables: {
-      sampleShoppingListId: data?.sampleShoppingListId ? +data.sampleShoppingListId : 1,
+      sampleShoppingListId: data?.sampleShoppingListId ? Number(data.sampleShoppingListId) : 1,
       shoppingListData: {
         name: data.name,
         description: data.description,
@@ -533,7 +575,7 @@ export const createBcShoppingList = (data: Partial<ShoppingListParams>) =>
       shoppingListData: {
         name: data.name,
         description: data.description,
-        channelId: data?.channelId ? +data.channelId : 1,
+        channelId: data?.channelId ? Number(data.channelId) : 1,
       },
     },
   });
@@ -542,11 +584,11 @@ export const updateBcShoppingList = (data: Partial<ShoppingListParams>) =>
   B3Request.graphqlB2B({
     query: updateCustomerShoppingList('customerShoppingListsUpdate'),
     variables: {
-      id: data?.id ? +data.id : 1,
+      id: data?.id ? Number(data.id) : 1,
       shoppingListData: {
         name: data.name,
         description: data.description,
-        channelId: data?.channelId ? +data.channelId : 1,
+        channelId: data?.channelId ? Number(data.channelId) : 1,
       },
     },
   });
@@ -555,7 +597,7 @@ export const duplicateBcShoppingList = (data: Partial<ShoppingListParams>) =>
   B3Request.graphqlB2B({
     query: duplicateCustomerShoppingList('customerShoppingListsDuplicate'),
     variables: {
-      sampleShoppingListId: data?.sampleShoppingListId ? +data.sampleShoppingListId : 1,
+      sampleShoppingListId: data?.sampleShoppingListId ? Number(data.sampleShoppingListId) : 1,
       shoppingListData: {
         name: data.name,
         description: data.description,

@@ -1,11 +1,10 @@
 import { SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Controller } from 'react-hook-form';
+import { Controller, useWatch } from 'react-hook-form';
 import { useB3Lang } from '@b3/lang';
 import { Autocomplete, FormControl, FormHelperText, TextField } from '@mui/material';
 import debounce from 'lodash-es/debounce';
 
 import { getB2BRoleList } from '@/shared/service/b2b';
-import { useAppSelector } from '@/store';
 
 import Form from './ui';
 
@@ -26,6 +25,7 @@ export default function B3ControlAutocomplete({ control, errors, ...rest }: Form
     validate,
     muiSelectProps,
     setValue,
+    getValues,
     setValueName,
     size = 'small',
     disabled = false,
@@ -50,6 +50,20 @@ export default function B3ControlAutocomplete({ control, errors, ...rest }: Form
     preSelectValue: '',
   });
 
+  const inputNameKey = `${name}Name`;
+  const nameKey = useWatch({
+    control,
+    name: inputNameKey,
+  });
+  useEffect(() => {
+    if (nameKey) {
+      setInputValue(getValues()[inputNameKey as string] || '');
+    } else {
+      setInputValue('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nameKey, inputNameKey]);
+
   const muiAttributeProps = muiSelectProps || {};
 
   const fieldsProps = {
@@ -66,12 +80,6 @@ export default function B3ControlAutocomplete({ control, errors, ...rest }: Form
     control,
   };
 
-  const companyInfoId = useAppSelector(({ company }) => company.companyInfo.id);
-  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
-  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
-
-  const companyId = isAgenting ? +salesRepCompanyId : +companyInfoId;
-
   const fetchData = async ({ type = '', value = '' }) => {
     if (loading) return;
     setLoading(true);
@@ -84,16 +92,17 @@ export default function B3ControlAutocomplete({ control, errors, ...rest }: Form
       const {
         companyRoles: { edges },
       } = await getB2BRoleList({
-        companyId,
         offset: (curPage - 1) * first,
         first,
         search: value,
       });
 
-      const list = edges.map((item: any) => ({
-        id: item.node.id,
-        name: item.node.name,
-      }));
+      const list = edges
+        .map((item: any) => ({
+          id: item.node.id,
+          name: item.node.name,
+        }))
+        .filter((item: any) => item.name !== 'Junior Buyer');
 
       setOptions((prevOptions) => (type === 'search' ? [...list] : [...prevOptions, ...list]));
       setHasMore(list.length > 0);
@@ -122,6 +131,7 @@ export default function B3ControlAutocomplete({ control, errors, ...rest }: Form
     cache.current.inputValue = value.name;
 
     setValue(name, value.id);
+    setValue(inputNameKey, value.name);
 
     if (setValueName) {
       setValueName(value.name);
@@ -189,6 +199,7 @@ export default function B3ControlAutocomplete({ control, errors, ...rest }: Form
     >
       <Controller
         {...fieldsProps}
+        key={fieldsProps.key}
         render={({ field }) => (
           <Autocomplete
             {...field}

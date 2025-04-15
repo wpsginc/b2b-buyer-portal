@@ -53,7 +53,7 @@ const FlexItem = styled('div')(
     flexGrow: width ? 0 : 1,
     flexShrink: width ? 0 : 1,
     alignItems: 'flex-start',
-    justifyContent: textAlignLocation === 'right' ? 'flex-end' : 'flex-start',
+    justifyContent: textAlignLocation,
     flexBasis,
     width,
     padding,
@@ -67,7 +67,7 @@ const ProductHead = styled('div')(() => ({
 }));
 
 const ProductImage = styled('img')(() => ({
-  width: '60px',
+  width: '45px',
   borderRadius: '4px',
   flexShrink: 0,
 }));

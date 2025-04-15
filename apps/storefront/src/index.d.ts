@@ -8,6 +8,7 @@ declare interface CustomFieldStringItems {
 
 type ChannelPlatform =
   | 'bigcommerce'
+  // cSpell:ignore acquia
   | 'acquia'
   | 'bloomreach'
   | 'catalyst'
@@ -21,30 +22,30 @@ type ChannelPlatform =
 
 declare interface Window {
   tipDispatch: import('@/shared/global/context/config.ts').DispatchProps;
-  b3Tipmessage: any;
   globalTipDispatch: any;
   B3: {
     setting: {
       channel_id: number;
       store_hash: string;
       platform: ChannelPlatform;
-      b2b_url: string;
-      captcha_setkey: string;
+      environment: import('@/types/global').Environment;
+      disable_logout_button?: boolean;
+      cart_url?: string;
     };
   };
-  /**
-   * B3Local will be removed soon, this is just to TS warns you if you add more variables to it
-   */
-  B3Local?: import('@b3/global-b3').B3Local;
   b2b: {
+    __get_asset_location: (filename: string) => string;
     initializationEnvironment: import('./load-functions').InitializationEnvironment;
-    callbacks: import('@/utils/b3Callbacks').default;
+    callbacks: import('@/utils/b3CallbackManager').default;
     utils: {
       openPage: (page: import('./constants').HeadlessRoute) => void;
+      getRoutes: () => import('@/shared/routeList').BuyerPortalRoute[];
       quote: {
         addProductFromPage: (item: import('@/utils').LineItems) => void;
         addProductsFromCart: () => Promise<void>;
+        addProductsFromCartId: (cartId: string) => Promise<void>;
         addProducts: (items: import('@/utils').LineItems[]) => Promise<void>;
+        getQuoteConfigs: () => import('@/shared/global/context/config').QuoteConfigProps[];
         getCurrent: () => {
           productList: import('@/components').FormattedQuoteItem[];
         };
@@ -52,7 +53,7 @@ declare interface Window {
         getButtonInfoAddAllFromCartToQuote: () => import('@/shared/customStyleButton/context/config').BtnProperties;
       };
       user: {
-        getProfile: () => Record<string, string | number>;
+        getProfile: () => Record<string, any>;
         getMasqueradeState: () => Promise<{
           current_company_id: number;
           companies: CustomFieldStringItems[];
@@ -62,6 +63,7 @@ declare interface Window {
         endMasquerade: () => void;
         graphqlBCProxy: typeof import('@/shared/service/request/b3Fetch').default.graphqlBCProxy;
         loginWithB2BStorefrontToken: (b2bStorefrontJWTToken: string) => Promise<void>;
+        logout: () => Promise<void>;
       };
       shoppingList: {
         itemFromCurrentPage: import('@/components').ProductMappedAttributes;
@@ -72,6 +74,10 @@ declare interface Window {
           description: string,
         ) => Promise<{ id: number; name: string; description: string }>;
         getButtonInfo: () => import('@/shared/customStyleButton/context/config').BtnProperties;
+      };
+      cart: {
+        setEntityId: (entityId: string) => void;
+        getEntityId: () => undefined | string;
       };
     };
   };

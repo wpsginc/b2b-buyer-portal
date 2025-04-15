@@ -1,3 +1,14 @@
+export enum Environment {
+  Production = 'production',
+  Staging = 'staging',
+  Integration = 'integration',
+  Local = 'local',
+}
+
+export type EnvSpecificConfig<ValueType> = {
+  [key in Environment]: ValueType;
+};
+
 export interface SimpleObject {
   [k: string]: string | number | undefined | null;
 }
@@ -15,4 +26,10 @@ export interface Address {
   street_1: string;
   street_2: string;
   zip: string;
+}
+
+export interface ConfigsSwitchStatusProps {
+  key: string;
+  id: string;
+  isEnabled: string;
 }

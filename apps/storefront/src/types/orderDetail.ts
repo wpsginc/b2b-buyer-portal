@@ -1,4 +1,5 @@
 import { Address } from './global';
+import { CompanyInfoTypes } from './invoice';
 
 export interface OrderProductOption {
   display_name: string;
@@ -64,6 +65,8 @@ export interface OrderProductItem {
   wrapping_name: string;
   current_quantity_shipped?: number;
   not_shipping_number?: number;
+  variantImageUrl?: string;
+  isVisible?: boolean;
 }
 
 export interface EditableProductItem extends OrderProductItem {
@@ -71,6 +74,43 @@ export interface EditableProductItem extends OrderProductItem {
   helperText?: string;
 }
 
+export interface EditableQty extends OrderItemList {
+  editQuantity: number | string;
+  helperText?: string;
+}
+
+export interface OrderItemList {
+  lineKey: number;
+  itemInternalID: number;
+  sku: string;
+  descr: string;
+  quantity: string;
+  returnableQuantity: number;
+  fulfilled: string;
+  productSku: string;
+  bcData: BCItemData;
+}
+export interface BCItemData {
+  id: number;
+  sku: string;
+  name: string;
+  images: string;
+}
+
+export interface InvoiceDetailList {
+  lineKey: number;
+  itemInternalID: number;
+  sku: string;
+  descr: string;
+  quantity: string;
+  rate: string;
+  amount: string;
+}
+
+export interface CustomInvoiceList {
+  invNumber: string;
+  invID: string;
+}
 export interface OrderShipmentProductItem {
   order_product_id: number;
   product_id: number;
@@ -89,7 +129,7 @@ export interface OrderShipmentItem {
   order_id: number;
   shipping_address: Address;
   shipping_method: string;
-  shipping_provider: string;
+  shipping_provider_display_name: string;
   tracking_carrier: string;
   tracking_link: string;
   generated_tracking_link?: string;
@@ -161,7 +201,17 @@ export interface OrderPayment {
 
 export interface OrderBillings {
   billingAddress: Address;
-  products: OrderProductItem[];
+  digitalProducts: OrderProductItem[];
+}
+
+export interface CouponsInfo {
+  amount: string;
+  code: string;
+  coupon_id: number;
+  discount: string;
+  id: number;
+  order_id: number;
+  type: number;
 }
 
 export interface B2BOrderData {
@@ -174,6 +224,7 @@ export interface B2BOrderData {
   channelId: string;
   companyName: string | null;
   couponDiscount: string;
+  coupons: CouponsInfo[];
   createdEmail: string;
   creditCardType: string | null;
   currencyCode: string;
@@ -215,7 +266,7 @@ export interface B2BOrderData {
   referenceNumber: string;
   refundedAmount: string;
   shipments: OrderShipmentItem[];
-  shippingAddress: OrderShippingAddressItem[];
+  shippingAddress: OrderShippingAddressItem[] | false;
   shippingAddressCount: number;
   shippingCostExTax: string;
   shippingCostIncTax: string;
@@ -238,6 +289,8 @@ export interface B2BOrderData {
   wrappingCostIncTax: string;
   wrappingCostTax: string;
   wrappingCostTaxClassId: number;
+  giftCertificateAmount: string;
+  companyInfo: CompanyInfoTypes;
 }
 
 export interface OrderDetailsResponse {
@@ -249,6 +302,9 @@ export interface OrderSummary {
   createAt: string;
   name: string;
   priceData: {
+    [k: string]: string;
+  };
+  priceSymbol: {
     [k: string]: string;
   };
 }

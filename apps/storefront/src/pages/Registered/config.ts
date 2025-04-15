@@ -1,6 +1,8 @@
+import { UseFormSetError } from 'react-hook-form';
 import { LangFormatFunction } from '@b3/lang';
 import format from 'date-fns/format';
 
+import { validateAddressExtraFields, validateBCCompanyExtraFields } from '@/shared/service/b2b';
 import { getLineNumber, validatorRules } from '@/utils';
 
 import { RegisterFields } from './types';
@@ -81,7 +83,11 @@ export interface RegisterFieldsItems {
   replaceOptions?: ReplaceOptionsProps;
 }
 
-export const steps = ['register.step.account', 'register.step.details', 'register.step.finish'];
+export const steps = [
+  'register.step.account',
+  'register.step.details',
+  'register.step.finish',
+] as const;
 
 const companyExtraFieldsType = ['text', 'multiline', 'number', 'dropdown'];
 
@@ -107,9 +113,9 @@ const classificationType = (item: CustomFieldItems) => {
   if (fieldsType.text.includes(item.fieldType)) {
     optionItems = {
       minlength: item.minlength || null,
-      maxLength: item.maxLength || +item.maximumLength || null,
+      maxLength: item.maxLength || Number(item.maximumLength) || null,
       min: item.min || null,
-      max: item.max || +item.maximumValue || null,
+      max: item.max || Number(item.maximumValue) || null,
       rows: item?.options?.rows || item.numberOfRows || null,
     };
     if (optionItems?.max) {
@@ -412,4 +418,55 @@ export const emailError: EmailError = {
   4: 'global.emailValidate.companyUsed',
   5: 'global.emailValidate.alreadyExits',
   6: 'global.emailValidate.usedSuperAdmin',
+};
+
+interface ValidateExtraFieldsProps {
+  fields: RegisterFields[];
+  data: CustomFieldItems;
+  type: 'company' | 'address';
+  setError: UseFormSetError<CustomFieldItems>;
+}
+
+export const validateExtraFields = async ({
+  fields,
+  data,
+  type,
+  setError,
+}: ValidateExtraFieldsProps) => {
+  return new Promise((resolve, reject) => {
+    const init = async () => {
+      const customFields = fields.filter((item) => !!item.custom);
+
+      const extraFields = customFields.map((field: RegisterFields) => ({
+        fieldName: Base64.decode(field.name),
+        fieldValue: data[field.name] || field.default,
+      }));
+
+      const fn = type === 'company' ? validateBCCompanyExtraFields : validateAddressExtraFields;
+
+      const result = await fn({
+        extraFields,
+      });
+
+      if (result.code !== 200) {
+        const message = result.data?.errMsg || result.message || '';
+
+        const messageArr = message.split(':');
+
+        if (messageArr.length >= 2) {
+          const field = customFields.find((field) => Base64.decode(field.name) === messageArr[0]);
+          if (field) {
+            setError(field.name, {
+              type: 'manual',
+              message: messageArr[1],
+            });
+          }
+        }
+        reject(message);
+      }
+      resolve(result);
+    };
+
+    init();
+  });
 };
