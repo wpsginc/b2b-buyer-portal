@@ -44,10 +44,10 @@ interface RowProps {
 function Row({ isRow = true, type = '', value, label, code }: RowProps) {
   const getNewVal = (): string | number | Date => {
     if (type === 'time') {
-      return displayFormat(+value) || '';
+      return displayFormat(Number(value)) || '';
     }
     if (type === 'currency') {
-      const val = +(value || 0);
+      const val = Number(value || 0);
       const accountValue = handleGetCorrespondingCurrency(code, val);
       return accountValue;
     }
@@ -203,7 +203,7 @@ function PaymentSuccessList({ list }: { list: InvoiceSuccessData }) {
             invoiceNumber,
             amount: { value, code },
           } = item.node;
-          const val = +(value || 0);
+          const val = Number(value || 0);
 
           const accountValue = handleGetCorrespondingCurrency(code, val);
           return (
@@ -232,7 +232,7 @@ interface PaymentSuccessProps {
 
 function PaymentSuccess({ receiptId, type }: PaymentSuccessProps) {
   const [isMobile] = useMobile();
-  const [loadding, setLoadding] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const [open, setOpen] = useState<boolean>(false);
 
@@ -244,12 +244,12 @@ function PaymentSuccess({ receiptId, type }: PaymentSuccessProps) {
 
   useEffect(() => {
     const init = async () => {
-      setLoadding(true);
-      const { receipt } = await getInvoicePaymentInfo(+receiptId);
+      setLoading(true);
+      const { receipt } = await getInvoicePaymentInfo(Number(receiptId));
 
       setDetailData(receipt);
       setOpen(true);
-      setLoadding(false);
+      setLoading(false);
     };
 
     if (type === InvoiceListType.CHECKOUT && receiptId) {
@@ -277,11 +277,11 @@ function PaymentSuccess({ receiptId, type }: PaymentSuccessProps) {
     >
       <Box
         sx={{
-          width: isMobile ? '100%' : `${'384px'}`,
+          width: isMobile ? '100%' : '384px',
           maxHeight: '600px',
         }}
       >
-        <B3Spin isSpinning={loadding}>
+        <B3Spin isSpinning={loading}>
           <Box
             sx={{
               display: 'flex',

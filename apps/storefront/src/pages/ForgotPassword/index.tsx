@@ -10,7 +10,7 @@ import { Captcha } from '@/components/form';
 import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import { getStorefrontToken, requestResetPassword } from '@/shared/service/b2b/graphql/recaptcha';
 import b2bLogger from '@/utils/b3Logger';
 
@@ -68,7 +68,7 @@ export function ForgotPassword({
       if (isEnabledOnStorefront && captchaKey) {
         try {
           await requestResetPassword(captchaKey, emailAddressReset);
-          navigate('/login?loginFlag=2');
+          navigate('/login?loginFlag=receivePassword');
           setLoading(false);
         } catch (e) {
           b2bLogger.error(e);
@@ -78,7 +78,7 @@ export function ForgotPassword({
       if (!isEnabledOnStorefront) {
         await sendEmail(emailAddress);
         setLoading(false);
-        navigate('/login?loginFlag=2');
+        navigate('/login?loginFlag=receivePassword');
       }
     } catch (e) {
       b2bLogger.error(e);
@@ -129,7 +129,7 @@ export function ForgotPassword({
               margin: '16px 0',
             }}
           >
-            {b3Lang('forgotpassword.resetPassword')}
+            {b3Lang('forgotPassword.resetPassword')}
           </Typography>
           <Typography
             variant="body1"
@@ -137,7 +137,7 @@ export function ForgotPassword({
               margin: '0 16px 16px 16px',
             }}
           >
-            {b3Lang('forgotpassword.requestEmail')}
+            {b3Lang('forgotPassword.requestEmail')}
           </Typography>
           <B3CustomForm
             formFields={forgotPasswordFields}
@@ -185,7 +185,7 @@ export function ForgotPassword({
                 variant="contained"
                 sx={{ width: 'auto' }}
               >
-                {b3Lang('forgotpassword.resetPasswordBtn')}
+                {b3Lang('forgotPassword.resetPasswordBtn')}
               </CustomButton>
             </B3ResetPassWordButton>
           </B3Spin>
@@ -196,7 +196,7 @@ export function ForgotPassword({
 }
 
 export default function Page({ setOpenPage }: PageProps) {
-  const { logo } = useContext(GlobaledContext).state;
+  const { logo } = useContext(GlobalContext).state;
   const { loginPageDisplay } = useContext(CustomStyleContext).state;
   const [isEnabledOnStorefront, setIsEnabledOnStorefront] = useState(false);
   const [storefrontSiteKey, setStorefrontSiteKey] = useState('');

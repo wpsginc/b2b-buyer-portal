@@ -1,4 +1,7 @@
-import { LangFormatFunction } from '@b3/lang';
+import { LangFormatFunction, useB3Lang } from '@b3/lang';
+
+import { CompanyInfoTypes } from '@/types/invoice';
+import { ShoppingListStatus } from '@/types/shoppingList';
 
 export interface ShoppingListSearch {
   search?: string;
@@ -36,6 +39,8 @@ export interface ShoppingListsItemsProps {
   channelId: number;
   approvedFlag: boolean;
   isOwner: boolean;
+  companyInfo: CompanyInfoTypes | null;
+  companyId?: number;
 }
 
 export interface GetFilterMoreListProps {
@@ -53,86 +58,78 @@ export interface GetFilterMoreListProps {
   idLang?: string;
 }
 
-export const getFilterShoppingListStatus = (
-  submitShoppingListPermission: boolean,
-): Array<ShoppingListStatusProps> => {
-  const shoppingListStatus: Array<ShoppingListStatusProps> = [
-    {
-      label: 'All',
-      value: 99,
-      idLang: 'global.shoppingLists.status.all',
-    },
-    {
-      label: 'Approved',
-      value: 0,
-      idLang: 'global.shoppingLists.status.approved',
-    },
-    {
-      label: 'Draft',
-      value: 30,
-      idLang: 'global.shoppingLists.status.draft',
-    },
-    {
-      label: 'Ready for approval',
-      value: 40,
-      idLang: 'global.shoppingLists.status.readyForApproval',
-    },
-    {
-      label: 'Rejected',
-      value: 20,
-      idLang: 'global.shoppingLists.status.rejected',
-    },
-  ];
+const useGetFilterShoppingListStatus = () => {
+  const b3Lang = useB3Lang();
 
-  const getShoppingListStatus = !submitShoppingListPermission
-    ? shoppingListStatus.filter(
-        (item: ShoppingListStatusProps) => item.value !== 30 && item.value !== 20,
-      )
-    : shoppingListStatus;
+  return (submitShoppingListPermission: boolean) => {
+    const draftStatus = {
+      value: ShoppingListStatus.Draft,
+      label: b3Lang('global.shoppingLists.status.draft'),
+    };
+    const rejectedStatus = {
+      value: ShoppingListStatus.Rejected,
+      label: b3Lang('global.shoppingLists.status.rejected'),
+    };
 
-  return getShoppingListStatus;
+    // TODO: fix 99 which is used for selecting all
+    return [
+      { value: 99, label: b3Lang('global.shoppingLists.status.all') },
+      { value: ShoppingListStatus.Approved, label: b3Lang('global.shoppingLists.status.approved') },
+      ...(submitShoppingListPermission ? [draftStatus] : []),
+      {
+        value: ShoppingListStatus.ReadyForApproval,
+        label: b3Lang('global.shoppingLists.status.readyForApproval'),
+      },
+      ...(submitShoppingListPermission ? [rejectedStatus] : []),
+    ];
+  };
 };
 
-export const getFilterMoreList = (
-  createdByUsers: any,
-  submitShoppingListPermission: boolean,
-): GetFilterMoreListProps[] => {
-  const newCreatedByUsers =
-    createdByUsers?.createdByUser?.results.map((item: any) => ({
-      createdBy: `${item.firstName} ${item.lastName} (${item.email})`,
-    })) || [];
-  const filterMoreList = [
-    {
-      name: 'createdBy',
-      label: 'Created by',
-      required: false,
-      default: '',
-      fieldType: 'dropdown',
-      options: newCreatedByUsers,
-      replaceOptions: {
-        label: 'createdBy',
-        value: 'createdBy',
-      },
-      xs: 12,
-      variant: 'filled',
-      size: 'small',
-      idLang: 'global.shoppingLists.filter.createdBy',
-    },
-    {
-      name: 'status',
-      label: 'Status',
-      required: false,
-      default: '',
-      fieldType: 'dropdown',
-      options: getFilterShoppingListStatus(submitShoppingListPermission),
-      xs: 12,
-      variant: 'filled',
-      size: 'small',
-      idLang: 'global.shoppingLists.filter.status',
-    },
-  ];
+interface CreatedByUsers {
+  createdByUser?: {
+    results: Array<{ firstName: string; lastName: string; email: string }>;
+  };
+}
 
-  return filterMoreList;
+export const useGetFilterMoreList = () => {
+  const b3Lang = useB3Lang();
+  const getFilterShoppingListStatus = useGetFilterShoppingListStatus();
+
+  return (submitShoppingListPermission: boolean, createdByUsers: CreatedByUsers) => {
+    const newCreatedByUsers =
+      createdByUsers?.createdByUser?.results.map((item) => ({
+        createdBy: `${item.firstName} ${item.lastName} (${item.email})`,
+      })) || [];
+
+    return [
+      {
+        name: 'createdBy',
+        required: false,
+        default: '',
+        fieldType: 'dropdown',
+        options: newCreatedByUsers,
+        replaceOptions: {
+          label: 'createdBy',
+          value: 'createdBy',
+        },
+        xs: 12,
+        variant: 'filled',
+        size: 'small',
+        label: b3Lang('global.shoppingLists.filter.createdBy'),
+      },
+      {
+        name: 'status',
+        required: false,
+        default: '',
+        fieldType: 'dropdown',
+        options: getFilterShoppingListStatus(submitShoppingListPermission),
+        xs: 12,
+        variant: 'filled',
+        size: 'small',
+        label: b3Lang('global.shoppingLists.filter.status'),
+      },
+    ];
+  };
 };
 
 export const getCreatedShoppingListFiles = (

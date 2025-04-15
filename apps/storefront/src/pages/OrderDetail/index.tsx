@@ -8,7 +8,7 @@ import { b3HexToRgb, getContrastColor } from '@/components/outSideComponents/uti
 import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   getB2BAddressConfig,
   getB2BOrderDetails,
@@ -18,9 +18,9 @@ import {
 } from '@/shared/service/b2b';
 import { getNSReturnDetails } from '@/shared/service/b2b/graphql/orders';
 import { isB2BUserSelector, useAppSelector } from '@/store';
+import { AddressConfigItem, OrderProductItem, OrderStatusItem } from '@/types';
 import b2bLogger from '@/utils/b3Logger';
 
-import { AddressConfigItem, OrderProductItem, OrderStatusItem } from '../../types';
 import OrderStatus from '../order/components/OrderStatus';
 import { orderStatusTranslationVariables } from '../order/shared/getOrderStatus';
 
@@ -55,7 +55,7 @@ function OrderDetail() {
   const {
     state: { addressConfig },
     dispatch: globalDispatch,
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const {
     state: { poNumber, status = '', customStatus, orderSummary, orderStatus = [] },
@@ -75,6 +75,7 @@ function OrderDetail() {
     },
   } = useContext(CustomStyleContext);
 
+  const { id: currentCompanyId } = useAppSelector(({ company }) => company.companyInfo);
   const customColor = getContrastColor(backgroundColor);
   const localtion = useLocation();
   const [isMobile] = useMobile();
@@ -82,18 +83,16 @@ function OrderDetail() {
   const [orderId, setOrderId] = useState('');
   const [nsInternalId, setNSInternalID] = useState('');
   const [isRequestLoading, setIsRequestLoading] = useState(false);
+  const [isCurrentCompany, setIsCurrentCompany] = useState(false);
 
   const customerId = useAppSelector(({ company }) => company.customer.id);
 
   const goToOrders = () => {
-    navigate(
-      `${(localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders'}`,
-      {
-        state: {
-          isNetsuiteOrder: nsInternalId ? 1 : 0,
-        },
+    navigate((localtion.state as LocationState).isCompanyOrder ? '/company-orders' : '/orders', {
+      state: {
+        isNetsuiteOrder: nsInternalId ? 1 : 0,
       },
-    );
+    });
   };
 
   const checkOrderValue = (bcOrder: string) => {
@@ -170,7 +169,7 @@ function OrderDetail() {
           const order = isB2BUser ? await getB2BOrderDetails(id) : await getBCOrderDetails(id);
 
           if (order) {
-            const { products } = order;
+            const { products, companyInfo } = order;
 
             const newOrder = {
               ...order,
@@ -181,6 +180,8 @@ function OrderDetail() {
                 };
               }),
             };
+
+            setIsCurrentCompany(Number(companyInfo.companyId) === Number(currentCompanyId));
 
             const data = isB2BUser
               ? convertB2BOrderDetails(newOrder, b3Lang)
@@ -234,7 +235,7 @@ function OrderDetail() {
       try {
         let configList = addressConfig;
         if (!configList) {
-          const { addressConfig: newConfig }: CustomFieldItems = await getB2BAddressConfig();
+          const { addressConfig: newConfig } = await getB2BAddressConfig();
           configList = newConfig;
 
           globalDispatch({
@@ -395,8 +396,8 @@ function OrderDetail() {
                 <NSOrderItemList />
               ) : (
                 <>
-                  <OrderShipping />
-                  <OrderBilling />
+                  <OrderShipping isCurrentCompany={isCurrentCompany} />
+                  <OrderBilling isCurrentCompany={isCurrentCompany} />
                   <OrderHistory />
                 </>
               )}
@@ -416,7 +417,7 @@ function OrderDetail() {
           >
             {nsInternalId && nsDetailsData ? <OrderOtherDetails /> : ''}
             {JSON.stringify(orderSummary) === '{}' ? null : (
-              <OrderAction detailsData={detailsData} />
+              <OrderAction detailsData={detailsData} isCurrentCompany={isCurrentCompany} />
             )}
           </Grid>
         </Grid>

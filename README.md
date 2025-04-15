@@ -1,6 +1,4 @@
-<a href="https://bundleb2b.stoplight.io/docs/openapi/quick-start" target="_blank" rel="noopener norerrer">
-  <img src="https://storage.googleapis.com/bigcommerce-developers/images/B2B-edition-1024x683.jpg" alt="B2B Edition Open Source Buyer Portal" title="B2B Edition Open Source Buyer Portal">
-</a>
+<img src="https://storage.googleapis.com/bigcommerce-developers/images/B2B-edition-1024x683.jpg" alt="B2B Edition Open Source Buyer Portal" title="B2B Edition Open Source Buyer Portal">
 
 <br />
 <br />
@@ -14,7 +12,7 @@
 
 **B2B Buyer Portal** is a monorepo frontend application designed for the BigCommerce B2B Edition Buyer portal. The B2B Buyer Portal is built using [Turborepo](https://turbo.build/), [TypeScript](https://www.typescriptlang.org/), and [React](https://react.dev/).
 
-By choosing to build on top of our Open Source B2B Buyer Portal, you'll have access to build on our B2B buyer portal application backed by a robust set of SaaS APIs. 
+By choosing to build on top of our Open Source B2B Buyer Portal, you'll have access to build on our B2B buyer portal application backed by a robust set of SaaS APIs.
 You can get straight to work building for your unique B2B business cases.
 
 ![-----------------------------------------------------](https://storage.googleapis.com/bigcommerce-developers/images/catalyst_readme_hr.png)
@@ -66,7 +64,7 @@ Choose the channel where you wish to enable B2B functionality. Initially, B2B fe
 
 ### Step 4: Contact Us for Additional Support
 
-For assistance with activating the remote buyer portal or to inquire about multi-storefront support, which allows you to utilize B2B features across multiple channels, please reach out to our team at b2b@bigcommerce.com, or raise an issue right here in this repository.
+For assistance with activating the remote buyer portal or to inquire about multi-storefront support, which allows you to utilize B2B features across multiple channels, please reach out to support, or raise an issue right here in this repository.
 
 ## 🚀 Core Technologies
 
@@ -89,8 +87,6 @@ For assistance with activating the remote buyer portal or to inquire about multi
 ## 🛠 Tools and Libraries
 
 - **Linting:** ESLint
-- **Commit Standards:** commitlint
-- **Git Workflow Tools:** Husky, lint-staged
 - **UI Framework:** MUI 5
 - **Routing:** React Router 6
 

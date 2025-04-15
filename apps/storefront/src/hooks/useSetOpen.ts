@@ -1,14 +1,14 @@
 import { useContext, useEffect } from 'react';
 
-import { DynamicallyVariableedContext } from '@/shared/dynamicallyVariable';
-import { GlobaledContext } from '@/shared/global';
+import { DynamicallyVariableContext } from '@/shared/dynamicallyVariable';
+import { GlobalContext } from '@/shared/global';
 
 const { height: defaultHeight, overflow: defaultOverflow } = document.body.style;
 
 const useSetOpen = (isOpen: boolean, _?: string, params?: CustomFieldItems) => {
-  const { dispatch } = useContext(GlobaledContext);
+  const { dispatch } = useContext(GlobalContext);
 
-  const { dispatch: dispatchMsg } = useContext(DynamicallyVariableedContext);
+  const { dispatch: dispatchMsg } = useContext(DynamicallyVariableContext);
   useEffect(() => {
     if (isOpen) {
       // The iframe screen is removed

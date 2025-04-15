@@ -1,4 +1,5 @@
 /* eslint-disable import/no-extraneous-dependencies */
+// cspell:ignore onwarn, pdfobject
 /// <reference types="vitest" />
 import legacy from '@vitejs/plugin-legacy';
 import react from '@vitejs/plugin-react';
@@ -6,17 +7,9 @@ import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, loadEnv } from 'vite';
 
-interface AssetsAbsolutePathProps {
-  [key: string]: string;
-}
-
-const assetsAbsolutePath: AssetsAbsolutePathProps = {
-  staging: 'https://cdn.bundleb2b.net/b2b/staging/storefront/assets/',
-  production: 'https://cdn.bundleb2b.net/b2b/production/storefront/assets/',
-};
-
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
+
   return {
     plugins: [
       legacy({
@@ -25,28 +18,18 @@ export default defineConfig(({ mode }) => {
       react(),
     ],
     experimental: {
-      renderBuiltUrl(
-        filename: string,
-        {
-          type,
-        }: {
-          type: 'public' | 'asset';
-        },
-      ) {
-        const isCustom = env.VITE_ASSETS_ABSOLUTE_PATH !== undefined;
-
-        if (type === 'asset') {
-          const name = filename.split('assets/')[1];
-          return isCustom
-            ? `${env.VITE_ASSETS_ABSOLUTE_PATH}${name}`
-            : `${assetsAbsolutePath[mode]}${name}`;
-        }
-
-        return undefined;
+      renderBuiltUrl(filename: string) {
+        const isCustomBuyerPortal = env.VITE_ASSETS_ABSOLUTE_PATH !== undefined;
+        return isCustomBuyerPortal
+          ? `${env.VITE_ASSETS_ABSOLUTE_PATH}${filename}`
+          : {
+              runtime: `window.b2b.__get_asset_location(${JSON.stringify(filename)})`,
+            };
       },
     },
     server: {
       port: 3001,
+      cors: true,
       proxy: {
         '/bigcommerce': {
           target:
@@ -59,7 +42,7 @@ export default defineConfig(({ mode }) => {
     test: {
       env: {
         VITE_B2B_URL: 'https://api-b2b.bigcommerce.com',
-        VITE_LOCAL_DEBUG: 'TRUE',
+        VITE_IS_LOCAL_ENVIRONMENT: 'TRUE',
       },
       clearMocks: true,
       mockReset: true,
@@ -98,7 +81,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           index: 'src/main.ts',
-          headless: 'src/buyerPortal.ts',
+          headless: 'src/headless.ts',
         },
         output: {
           entryFileNames(info) {

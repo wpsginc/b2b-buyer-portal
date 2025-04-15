@@ -87,5 +87,8 @@ module.exports = {
     ],
     'react/jsx-no-useless-fragment': ['warn', { allowExpressions: true }],
     'import/prefer-default-export': 'off',
+    'no-implicit-coercion': 'error',
+    'react/prop-types': 'off',
+    '@typescript-eslint/no-useless-template-literals': 'error',
   },
 }

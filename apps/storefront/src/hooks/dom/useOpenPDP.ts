@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useRef } from 'react';
-import globalB3 from '@b3/global-b3';
+import config from '@b3/global-b3';
 import { AnyAction, Dispatch as DispatchRedux } from '@reduxjs/toolkit';
 import cloneDeep from 'lodash-es/cloneDeep';
 
@@ -10,13 +10,13 @@ import {
   splitCustomCssValue,
 } from '@/components/outSideComponents/utils/b3CustomStyles';
 import {
-  ADD_TO_SHOPPING_LIST_DEFUALT_VALUE,
-  TRANSLATION_SHOPPING_LIST_BTN_VARAIBLE,
+  ADD_TO_SHOPPING_LIST_DEFAULT_VALUE,
+  TRANSLATION_SHOPPING_LIST_BTN_VARIABLE,
 } from '@/constants';
 import { type SetOpenPage } from '@/pages/SetOpenPage';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
-import { isB2BUserSelector, setGlabolCommonState, useAppDispatch, useAppSelector } from '@/store';
+import { GlobalContext } from '@/shared/global';
+import { isB2BUserSelector, setGlobalCommonState, useAppDispatch, useAppSelector } from '@/store';
 
 import useGetButtonText from '../useGetButtonText';
 import useRole from '../useRole';
@@ -45,7 +45,7 @@ export const addProductFromPage = ({
 }: AddProductFromPageParams) => {
   if (role === 100) {
     storeDispatch(
-      setGlabolCommonState({
+      setGlobalCommonState({
         globalMessage: {
           open: true,
           title: 'Registration',
@@ -75,7 +75,7 @@ export const useOpenPDP = ({ setOpenPage, role }: MutationObserverProps) => {
   const {
     dispatch,
     state: { shoppingListEnabled, registerEnabled },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
   const isB2BUser = useAppSelector(isB2BUserSelector);
 
   const [roleText] = useRole();
@@ -97,7 +97,7 @@ export const useOpenPDP = ({ setOpenPage, role }: MutationObserverProps) => {
       });
 
       addProductFromPage({
-        role: +role,
+        role: Number(role),
         storeDispatch,
         saveFn: jumpRegister,
         setOpenPage,
@@ -109,7 +109,7 @@ export const useOpenPDP = ({ setOpenPage, role }: MutationObserverProps) => {
     [role, registerEnabled],
   );
 
-  const [openQuickView] = useDomVariation(globalB3['dom.setToShoppingListParentEl']);
+  const [openQuickView] = useDomVariation(config['dom.setToShoppingListParentEl']);
 
   const {
     color = '#74685c',
@@ -120,9 +120,9 @@ export const useOpenPDP = ({ setOpenPage, role }: MutationObserverProps) => {
     enabled = false,
   } = shoppingListBtn;
   const myShoppingListBtnLabel = useGetButtonText(
-    TRANSLATION_SHOPPING_LIST_BTN_VARAIBLE,
+    TRANSLATION_SHOPPING_LIST_BTN_VARIABLE,
     text,
-    ADD_TO_SHOPPING_LIST_DEFUALT_VALUE,
+    ADD_TO_SHOPPING_LIST_DEFAULT_VALUE,
   );
 
   const cssInfo = splitCustomCssValue(customCss);
@@ -137,9 +137,7 @@ export const useOpenPDP = ({ setOpenPage, role }: MutationObserverProps) => {
 
   useEffect(() => {
     // if (role === 100) return
-    const addToShoppingListAll = document.querySelectorAll(
-      globalB3['dom.setToShoppingListParentEl'],
-    );
+    const addToShoppingListAll = document.querySelectorAll(config['dom.setToShoppingListParentEl']);
     const CustomAddToShoppingListAll = locationSelector
       ? document.querySelectorAll(locationSelector)
       : [];

@@ -1,4 +1,5 @@
 import { Address } from './global';
+import { CompanyInfoTypes } from './invoice';
 
 export interface OrderProductOption {
   display_name: string;
@@ -128,7 +129,7 @@ export interface OrderShipmentItem {
   order_id: number;
   shipping_address: Address;
   shipping_method: string;
-  shipping_provider: string;
+  shipping_provider_display_name: string;
   tracking_carrier: string;
   tracking_link: string;
   generated_tracking_link?: string;
@@ -200,7 +201,7 @@ export interface OrderPayment {
 
 export interface OrderBillings {
   billingAddress: Address;
-  products: OrderProductItem[];
+  digitalProducts: OrderProductItem[];
 }
 
 export interface CouponsInfo {
@@ -265,7 +266,7 @@ export interface B2BOrderData {
   referenceNumber: string;
   refundedAmount: string;
   shipments: OrderShipmentItem[];
-  shippingAddress: OrderShippingAddressItem[];
+  shippingAddress: OrderShippingAddressItem[] | false;
   shippingAddressCount: number;
   shippingCostExTax: string;
   shippingCostIncTax: string;
@@ -289,6 +290,7 @@ export interface B2BOrderData {
   wrappingCostTax: string;
   wrappingCostTaxClassId: number;
   giftCertificateAmount: string;
+  companyInfo: CompanyInfoTypes;
 }
 
 export interface OrderDetailsResponse {

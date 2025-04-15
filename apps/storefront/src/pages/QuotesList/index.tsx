@@ -1,14 +1,14 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LangFormatFunction, useB3Lang } from '@b3/lang';
+import { useB3Lang } from '@b3/lang';
 import { Box } from '@mui/material';
 
 import B3Filter from '@/components/filter/B3Filter';
 import B3Spin from '@/components/spin/B3Spin';
-import { B3PaginationTable } from '@/components/table/B3PaginationTable';
+import { B3PaginationTable, GetRequestList } from '@/components/table/B3PaginationTable';
 import { TableColumnItem } from '@/components/table/B3Table';
 import { useMobile, useSort } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   getB2BQuotesList,
   getBCQuotesList,
@@ -57,16 +57,38 @@ const quotesStatuses = [
   },
 ];
 
-const getFilterMoreList = (isB2BUser: boolean, createdByUsers: any, b3Lang: LangFormatFunction) => {
-  const newCreatedByUsers =
-    createdByUsers?.createdByUser?.results?.createdBy.map((item: any) => ({
-      createdBy: item.email ? `${item.name} (${item.email})` : `${item.name}`,
-    })) || [];
-  const newCreatedBySalesReps =
-    createdByUsers?.createdByUser?.results?.salesRep.map((item: any) => ({
-      salesRep: `${item.salesRep || item.salesRepEmail}`,
-    })) || [];
-  const filterMoreList = [
+const defaultSortKey = 'quoteNumber';
+
+const sortKeys = {
+  quoteNumber: 'quoteNumber',
+  quoteTitle: 'quoteTitle',
+  salesRep: 'salesRep',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  expiredAt: 'expiredAt',
+  status: 'status',
+};
+
+function useData() {
+  const companyB2BId = useAppSelector(({ company }) => company.companyInfo.id);
+  const customer = useAppSelector(({ company }) => company.customer);
+  const isB2BUser = useAppSelector(isB2BUserSelector);
+  const draftQuoteListLength = useAppSelector(({ quoteInfo }) => quoteInfo.draftQuoteList.length);
+  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
+  const b3Lang = useB3Lang();
+
+  const companyId = companyB2BId || salesRepCompanyId;
+
+  const getQuotesList = (
+    params: Partial<FilterSearchProps>,
+  ): ReturnType<typeof getB2BQuotesList | typeof getBCQuotesList> => {
+    return isB2BUser
+      ? getB2BQuotesList({ ...params, channelId })
+      : getBCQuotesList({ ...params, channelId });
+  };
+
+  const getFilters = () => [
     {
       name: 'status',
       label: b3Lang('quotes.quoteStatus'),
@@ -85,60 +107,152 @@ const getFilterMoreList = (isB2BUser: boolean, createdByUsers: any, b3Lang: Lang
       variant: 'filled',
       size: 'small',
     },
-    {
-      name: 'createdBy',
-      label: b3Lang('quotes.createdBy'),
-      required: false,
-      default: '',
-      fieldType: 'dropdown',
-      options: newCreatedByUsers,
-      replaceOptions: {
-        label: 'createdBy',
-        value: 'createdBy',
-      },
-      xs: 12,
-      variant: 'filled',
-      size: 'small',
-    },
-    {
-      name: 'salesRep',
-      label: b3Lang('quotes.salesRep'),
-      required: false,
-      default: '',
-      fieldType: 'dropdown',
-      options: newCreatedBySalesReps,
-      replaceOptions: {
-        label: 'salesRep',
-        value: 'salesRep',
-      },
-      xs: 12,
-      variant: 'filled',
-      size: 'small',
-    },
   ];
 
-  const filterCurrentMoreList = filterMoreList.filter((item) => {
-    if (!isB2BUser && (item.name === 'createdBy' || item.name === 'salesRep')) return false;
-    return true;
-  });
+  const getB2BFilters = async () => {
+    const createdByUsers = await getShoppingListsCreatedByUser(Number(companyId), 2);
 
-  return filterCurrentMoreList;
-};
+    const newCreatedByUsers =
+      createdByUsers?.createdByUser?.results?.createdBy.map((item: any) => ({
+        createdBy: item.email ? `${item.name} (${item.email})` : `${item.name}`,
+      })) || [];
 
-const defaultSortKey = 'quoteNumber';
+    const newCreatedBySalesReps =
+      createdByUsers?.createdByUser?.results?.salesRep.map((item: any) => ({
+        salesRep: `${item.salesRep || item.salesRepEmail}`,
+      })) || [];
 
-const sortKeys = {
-  quoteNumber: 'quoteNumber',
-  quoteTitle: 'quoteTitle',
-  salesRep: 'salesRep',
-  createdBy: 'createdBy',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  expiredAt: 'expiredAt',
-  status: 'status',
+    return [
+      ...getFilters(),
+      {
+        name: 'createdBy',
+        label: b3Lang('quotes.createdBy'),
+        required: false,
+        default: '',
+        fieldType: 'dropdown',
+        options: newCreatedByUsers,
+        replaceOptions: {
+          label: 'createdBy',
+          value: 'createdBy',
+        },
+        xs: 12,
+        variant: 'filled',
+        size: 'small',
+      },
+      {
+        name: 'salesRep',
+        label: b3Lang('quotes.salesRep'),
+        required: false,
+        default: '',
+        fieldType: 'dropdown',
+        options: newCreatedBySalesReps,
+        replaceOptions: {
+          label: 'salesRep',
+          value: 'salesRep',
+        },
+        xs: 12,
+        variant: 'filled',
+        size: 'small',
+      },
+    ];
+  };
+
+  const getAvailableFilters = async () => {
+    if (isB2BUser) {
+      return getB2BFilters();
+    }
+
+    return getFilters();
+  };
+
+  return {
+    companyId,
+    isB2BUser,
+    draftQuoteListLength,
+    customer,
+    getQuotesList,
+    getAvailableFilters,
+  };
+}
+
+const useColumnList = (): Array<TableColumnItem<ListItem>> => {
+  const b3Lang = useB3Lang();
+
+  return useMemo(
+    () => [
+      {
+        key: 'quoteNumber',
+        title: b3Lang('quotes.quoteNumber'),
+        isSortable: true,
+      },
+      {
+        key: 'quoteTitle',
+        title: b3Lang('quotes.title'),
+        isSortable: true,
+      },
+      {
+        key: 'salesRep',
+        title: b3Lang('quotes.salesRep'),
+        render: (item: ListItem) => `${item.salesRep || item.salesRepEmail}`,
+        isSortable: true,
+      },
+      {
+        key: 'createdBy',
+        title: b3Lang('quotes.createdBy'),
+        isSortable: true,
+      },
+      {
+        key: 'createdAt',
+        title: b3Lang('quotes.dateCreated'),
+        render: (item: ListItem) =>
+          `${Number(item.status) !== 0 ? displayFormat(Number(item.createdAt)) : item.createdAt}`,
+        isSortable: true,
+      },
+      {
+        key: 'updatedAt',
+        title: b3Lang('quotes.lastUpdate'),
+        render: (item: ListItem) =>
+          `${Number(item.status) !== 0 ? displayFormat(Number(item.updatedAt)) : item.updatedAt}`,
+        isSortable: true,
+      },
+      {
+        key: 'expiredAt',
+        title: b3Lang('quotes.expirationDate'),
+        render: (item: ListItem) =>
+          `${Number(item.status) !== 0 ? displayFormat(Number(item.expiredAt)) : item.expiredAt}`,
+        isSortable: true,
+      },
+      {
+        key: 'totalAmount',
+        title: b3Lang('quotes.subtotal'),
+        render: (item: ListItem) => {
+          const { totalAmount, currency } = item;
+          const newCurrency = currency as CurrencyProps;
+          return currencyFormatConvert(Number(totalAmount), {
+            currency: newCurrency,
+            isConversionRate: false,
+            useCurrentCurrency: !!currency,
+          });
+        },
+        style: {
+          textAlign: 'right',
+        },
+      },
+      {
+        key: 'status',
+        title: b3Lang('quotes.status'),
+        render: (item: ListItem) => <QuoteStatus code={item.status} />,
+        isSortable: true,
+      },
+    ],
+    [b3Lang],
+  );
 };
 
 function QuotesList() {
+  const { getAvailableFilters, draftQuoteListLength, customer, getQuotesList } = useData();
+  const columns = useColumnList();
+
   const initSearch = {
     q: '',
     orderBy: `-${sortKeys[defaultSortKey]}`,
@@ -148,6 +262,7 @@ function QuotesList() {
     dateCreatedBeginAt: '',
     dateCreatedEndAt: '',
   };
+
   const [filterData, setFilterData] = useState<Partial<FilterSearchProps>>(initSearch);
 
   const [isRequestLoading, setIsRequestLoading] = useState(false);
@@ -167,28 +282,13 @@ function QuotesList() {
 
   const [isMobile] = useMobile();
 
-  const companyB2BId = useAppSelector(({ company }) => company.companyInfo.id);
-  const customer = useAppSelector(({ company }) => company.customer);
   const {
     state: { openAPPParams },
     dispatch,
-  } = useContext(GlobaledContext);
-
-  const isB2BUser = useAppSelector(isB2BUserSelector);
-  const draftQuoteListLength = useAppSelector(({ quoteInfo }) => quoteInfo.draftQuoteList.length);
-  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
+  } = useContext(GlobalContext);
 
   useEffect(() => {
-    const initFilter = async () => {
-      const companyId = companyB2BId || salesRepCompanyId;
-      let createdByUsers: CustomFieldItems = {};
-      if (isB2BUser) createdByUsers = await getShoppingListsCreatedByUser(+companyId, 2);
-
-      const filterInfos = getFilterMoreList(isB2BUser, createdByUsers, b3Lang);
-      setFilterMoreInfo(filterInfos);
-    };
-
-    initFilter();
+    getAvailableFilters().then((filters) => setFilterMoreInfo(filters));
 
     if (openAPPParams.quoteBtn) {
       dispatch({
@@ -206,18 +306,16 @@ function QuotesList() {
   }, []);
 
   const goToDetail = (item: ListItem, status: number) => {
-    if (+status === 0) {
+    if (Number(status) === 0) {
       navigate('/quoteDraft');
     } else {
       navigate(`/quoteDetail/${item.id}?date=${item.createdAt}`);
     }
   };
 
-  const fetchList = useCallback(
-    async (params: Partial<FilterSearchProps>) => {
-      const { edges = [], totalCount } = isB2BUser
-        ? await getB2BQuotesList({ ...params, channelId })
-        : await getBCQuotesList({ ...params, channelId });
+  const fetchList: GetRequestList<Partial<FilterSearchProps>, ListItem> = useCallback(
+    async (params) => {
+      const { edges = [], totalCount } = await getQuotesList(params);
 
       if (params.offset === 0 && draftQuoteListLength) {
         const summaryPrice = addPrice();
@@ -256,75 +354,8 @@ function QuotesList() {
         totalCount,
       };
     },
-    [draftQuoteListLength, customer.firstName, customer.lastName, filterData, isB2BUser],
+    [getQuotesList, draftQuoteListLength, customer.firstName, customer.lastName, filterData],
   );
-
-  const columnAllItems: TableColumnItem<ListItem>[] = [
-    {
-      key: 'quoteNumber',
-      title: b3Lang('quotes.quoteNumber'),
-      isSortable: true,
-    },
-    {
-      key: 'quoteTitle',
-      title: b3Lang('quotes.title'),
-      isSortable: true,
-    },
-    {
-      key: 'salesRep',
-      title: b3Lang('quotes.salesRep'),
-      render: (item: ListItem) => `${item.salesRep || item.salesRepEmail}`,
-      isSortable: true,
-    },
-    {
-      key: 'createdBy',
-      title: b3Lang('quotes.createdBy'),
-      isSortable: true,
-    },
-    {
-      key: 'createdAt',
-      title: b3Lang('quotes.dateCreated'),
-      render: (item: ListItem) =>
-        `${+item.status !== 0 ? displayFormat(+item.createdAt) : item.createdAt}`,
-      isSortable: true,
-    },
-    {
-      key: 'updatedAt',
-      title: b3Lang('quotes.lastUpdate'),
-      render: (item: ListItem) =>
-        `${+item.status !== 0 ? displayFormat(+item.updatedAt) : item.updatedAt}`,
-      isSortable: true,
-    },
-    {
-      key: 'expiredAt',
-      title: b3Lang('quotes.expirationDate'),
-      render: (item: ListItem) =>
-        `${+item.status !== 0 ? displayFormat(+item.expiredAt) : item.expiredAt}`,
-      isSortable: true,
-    },
-    {
-      key: 'totalAmount',
-      title: b3Lang('quotes.subtotal'),
-      render: (item: ListItem) => {
-        const { totalAmount, currency } = item;
-        const newCurrency = currency as CurrencyProps;
-        return `${currencyFormatConvert(+totalAmount, {
-          currency: newCurrency,
-          isConversionRate: false,
-          useCurrentCurrency: !!currency,
-        })}`;
-      },
-      style: {
-        textAlign: 'right',
-      },
-    },
-    {
-      key: 'status',
-      title: b3Lang('quotes.status'),
-      render: (item: ListItem) => <QuoteStatus code={item.status} />,
-      isSortable: true,
-    },
-  ];
 
   const handleChange = (key: string, value: string) => {
     if (key === 'search') {
@@ -335,7 +366,7 @@ function QuotesList() {
     }
   };
 
-  const handleFirterChange = (value: Partial<FilterSearchProps>) => {
+  const handleFilterChange = (value: Partial<FilterSearchProps>) => {
     const search: Partial<FilterSearchProps> = {
       createdBy: value?.createdBy || '',
       status: value?.status || '',
@@ -360,7 +391,7 @@ function QuotesList() {
         }}
       >
         <B3Filter
-          fiterMoreInfo={filterMoreInfo}
+          filterMoreInfo={filterMoreInfo}
           startPicker={{
             isEnabled: true,
             label: b3Lang('quotes.from'),
@@ -374,10 +405,10 @@ function QuotesList() {
             pickerKey: 'end',
           }}
           handleChange={handleChange}
-          handleFilterChange={handleFirterChange}
+          handleFilterChange={handleFilterChange}
         />
         <B3PaginationTable
-          columnItems={columnAllItems}
+          columnItems={columns}
           rowsPerPageOptions={[10, 20, 30]}
           getRequestList={fetchList}
           searchParams={filterData}
@@ -387,12 +418,12 @@ function QuotesList() {
           sortDirection={order}
           orderBy={orderBy}
           sortByFn={handleSetOrderBy}
-          labelRowsPerPage={`${
+          labelRowsPerPage={
             isMobile ? b3Lang('quotes.cardsPerPage') : b3Lang('quotes.quotesPerPage')
-          }`}
-          renderItem={(row: ListItem) => <QuoteItemCard item={row} goToDetail={goToDetail} />}
-          onClickRow={(row: ListItem) => {
-            goToDetail(row, +row.status);
+          }
+          renderItem={(row) => <QuoteItemCard item={row} goToDetail={goToDetail} />}
+          onClickRow={(row) => {
+            goToDetail(row, Number(row.status));
           }}
           hover
         />
