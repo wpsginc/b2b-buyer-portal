@@ -10,9 +10,8 @@ import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
 import { getB2BShoppingList, getBcShoppingList } from '@/shared/service/b2b';
 import { isB2BUserSelector, rolePermissionSelector, useAppSelector } from '@/store';
+import { ShoppingListItem, ShoppingListStatus } from '@/types/shoppingList';
 import { channelId } from '@/utils';
-
-import { ShoppingListItem } from '../../../types';
 
 interface OrderShoppingListProps {
   isOpen: boolean;
@@ -73,7 +72,12 @@ export default function OrderShoppingList(props: OrderShoppingListProps) {
 
           const newList = list.filter(
             (item: CustomFieldItems) =>
-              item.node.status === +(submitShoppingListPermission ? 30 : 0),
+              item.node.status ===
+              Number(
+                submitShoppingListPermission
+                  ? ShoppingListStatus.Draft
+                  : ShoppingListStatus.Approved,
+              ),
           );
           setList(newList);
         }

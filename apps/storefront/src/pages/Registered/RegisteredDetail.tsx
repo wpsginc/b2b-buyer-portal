@@ -8,21 +8,19 @@ import { B3CustomForm } from '@/components';
 import { getContrastColor } from '@/components/outSideComponents/utils/b3CustomStyles';
 import { CustomStyleContext } from '@/shared/customStyleButton';
 
-import RegisteredStepButton from './component/RegisteredStepButton';
 import { RegisteredContext } from './context/RegisteredContext';
 import { Country, State, validateExtraFields } from './config';
+import { PrimaryButton } from './PrimaryButton';
 import { InformationFourLabels, TipContent } from './styled';
 import { RegisterFields } from './types';
 
 interface RegisteredDetailProps {
   handleBack: () => void;
   handleNext: () => void;
-  activeStep: number;
 }
 
-export default function RegisteredDetail(props: RegisteredDetailProps) {
+export default function RegisteredDetail({ handleBack, handleNext }: RegisteredDetailProps) {
   const b3Lang = useB3Lang();
-  const { handleBack, handleNext, activeStep } = props;
 
   const { state, dispatch } = useContext(RegisteredContext);
 
@@ -106,9 +104,11 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         if (stateList.length > 0) {
           stateFields.fieldType = 'dropdown';
           stateFields.options = stateList;
+          stateFields.required = true;
         } else {
           stateFields.fieldType = 'text';
           stateFields.options = [];
+          stateFields.required = false;
         }
       }
 
@@ -367,11 +367,19 @@ export default function RegisteredDetail(props: RegisteredDetailProps) {
         />
       </Box>
 
-      <RegisteredStepButton
-        handleBack={handleBackAccount}
-        handleNext={handleAccountToFinish}
-        activeStep={activeStep}
-      />
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          pt: 2,
+          gap: 1,
+        }}
+      >
+        <PrimaryButton onClick={handleBackAccount}>{b3Lang('global.button.back')}</PrimaryButton>
+        <PrimaryButton onClick={handleAccountToFinish}>
+          {b3Lang('global.button.next')}
+        </PrimaryButton>
+      </Box>
     </Box>
   );
 }

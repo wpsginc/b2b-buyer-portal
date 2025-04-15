@@ -3,13 +3,9 @@ import { Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-do
 
 import { RegisteredProvider } from '@/pages/Registered/context/RegisteredContext';
 import { type SetOpenPage } from '@/pages/SetOpenPage';
-import { GlobaledContext } from '@/shared/global';
-import {
-  firstLevelRouting,
-  getAllowedRoutes,
-  RouteFirstLevelItem,
-  RouteItem,
-} from '@/shared/routes';
+import { GlobalContext } from '@/shared/global';
+import { RouteFirstLevelItem, RouteItem } from '@/shared/routeList';
+import { firstLevelRouting, getAllowedRoutes } from '@/shared/routes';
 import { getPageTranslations, useAppDispatch } from '@/store';
 import { channelId } from '@/utils';
 
@@ -27,17 +23,17 @@ interface B3RenderRouterProps {
 
 export default function B3RenderRouter(props: B3RenderRouterProps) {
   const { setOpenPage, openUrl, isOpen } = props;
-  const { state: globaledState } = useContext(GlobaledContext);
-  const newRoutes = () => getAllowedRoutes(globaledState);
+  const { state: globalState } = useContext(GlobalContext);
+  const newRoutes = () => getAllowedRoutes(globalState);
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    if (openUrl && openUrl === '/dashboard?closeMasqurade=1') {
+    if (openUrl && openUrl === '/dashboard?closeMasquerade=1') {
       navigate('/dashboard', {
         state: {
-          closeMasqurade: '1',
+          closeMasquerade: '1',
         },
       });
     } else if (openUrl === '/dashboard') {
@@ -57,14 +53,14 @@ export default function B3RenderRouter(props: B3RenderRouterProps) {
 
       dispatch(
         getPageTranslations({
-          channelId: globaledState.multiStorefrontEnabled ? channelId : 0,
+          channelId: globalState.multiStorefrontEnabled ? channelId : 0,
           page,
         }),
       );
     },
     // ignore dispatch
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [globaledState.multiStorefrontEnabled, location.pathname],
+    [globalState.multiStorefrontEnabled, location.pathname],
   );
 
   return (

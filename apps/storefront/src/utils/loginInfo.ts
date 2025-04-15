@@ -1,11 +1,15 @@
 import {
+  endUserMasqueradingCompany,
   getAgentInfo,
   getB2BCompanyUserInfo,
   getB2BToken,
   getBCGraphqlToken,
+  getCompanySubsidiaries,
   getUserCompany,
+  getUserMasqueradingCompany,
 } from '@/shared/service/b2b';
 import { getCurrentCustomerJWT, getCustomerInfo } from '@/shared/service/bc';
+import { getAppClientId } from '@/shared/service/request/base';
 import {
   clearMasqueradeCompany,
   MasqueradeCompany,
@@ -16,7 +20,8 @@ import {
 import {
   clearCompanySlice,
   setB2BToken,
-  setbcGraphqlToken,
+  setBcGraphQLToken,
+  setCompanyHierarchyInfoModules,
   setCompanyInfo,
   setCompanyStatus,
   setCurrentCustomerJWT,
@@ -25,13 +30,14 @@ import {
   setPermissionModules,
 } from '@/store/slices/company';
 import { resetDraftQuoteInfo, resetDraftQuoteList } from '@/store/slices/quoteInfo';
-import { CompanyStatus, CustomerRole, LoginTypes, UserTypes } from '@/types';
+import { CompanyStatus, CustomerRole, CustomerRoleName, LoginTypes, UserTypes } from '@/types';
+import { getAccountHierarchyIsEnabled } from '@/utils/storefrontConfig';
 
 import b2bLogger from './b3Logger';
 import { B3LStorage, B3SStorage } from './b3Storage';
 import { channelId, storeHash } from './basicConfig';
 
-const { VITE_B2B_CLIENT_ID, VITE_LOCAL_DEBUG } = import.meta.env;
+const { VITE_IS_LOCAL_ENVIRONMENT } = import.meta.env;
 
 interface ChannelIdProps {
   channelId: number;
@@ -57,7 +63,7 @@ export const getCurrentStoreInfo = (
 
   let store;
 
-  if (VITE_LOCAL_DEBUG) {
+  if (VITE_IS_LOCAL_ENVIRONMENT) {
     store = {
       channelId: 1,
       urls: [],
@@ -94,7 +100,7 @@ export const getCurrentStoreInfo = (
   return storeItem || store;
 };
 
-export const getloginTokenInfo = () => {
+export const getLoginTokenInfo = () => {
   const currentTimestamp = Math.floor(Date.now() / 1000);
   const oneWeekInSeconds = 7 * 24 * 60 * 60;
   const expiresTimestamp = currentTimestamp + oneWeekInSeconds;
@@ -110,13 +116,12 @@ export const getloginTokenInfo = () => {
 };
 
 export const loginInfo = async () => {
-  const loginTokenInfo = getloginTokenInfo();
+  const loginTokenInfo = getLoginTokenInfo();
 
-  const {
-    storeFrontToken: { token },
-  } = await getBCGraphqlToken(loginTokenInfo);
-
-  store.dispatch(setbcGraphqlToken(token));
+  const token = await getBCGraphqlToken(loginTokenInfo);
+  if (token) {
+    store.dispatch(setBcGraphQLToken(token));
+  }
 };
 
 export const clearCurrentCustomerInfo = async () => {
@@ -141,7 +146,12 @@ export const clearCurrentCustomerInfo = async () => {
 // 3: inactive
 // 4: deleted
 
-const VALID_ROLES = [CustomerRole.ADMIN, CustomerRole.SENIOR_BUYER, CustomerRole.JUNIOR_BUYER];
+const VALID_ROLES = [
+  CustomerRole.ADMIN,
+  CustomerRole.SENIOR_BUYER,
+  CustomerRole.JUNIOR_BUYER,
+  CustomerRole.CUSTOM_ROLE,
+];
 
 export const getCompanyInfo = async (
   role: number | string,
@@ -155,9 +165,9 @@ export const getCompanyInfo = async (
   };
 
   const { B2BToken } = store.getState().company.tokens;
-  if (!B2BToken || !VALID_ROLES.includes(+role)) return companyInfo;
+  if (!B2BToken || !VALID_ROLES.includes(Number(role))) return companyInfo;
 
-  if (id && userType === UserTypes.MULTIPLE_B2C && +role !== CustomerRole.SUPER_ADMIN) {
+  if (id && userType === UserTypes.MULTIPLE_B2C && Number(role) !== CustomerRole.SUPER_ADMIN) {
     const { userCompany } = await getUserCompany(id);
 
     if (userCompany) {
@@ -185,7 +195,7 @@ export const getCompanyInfo = async (
 };
 
 export const agentInfo = async (customerId: number | string, role: number) => {
-  if (+role === CustomerRole.SUPER_ADMIN) {
+  if (Number(role) === CustomerRole.SUPER_ADMIN) {
     try {
       const data: any = await getAgentInfo(customerId);
       if (data?.superAdminMasquerading) {
@@ -235,18 +245,13 @@ const loginWithCurrentCustomerJWT = async () => {
   const prevCurrentCustomerJWT = store.getState().company.tokens.currentCustomerJWT;
   let currentCustomerJWT;
   try {
-    currentCustomerJWT = await getCurrentCustomerJWT(VITE_B2B_CLIENT_ID);
+    currentCustomerJWT = await getCurrentCustomerJWT(getAppClientId());
   } catch (error) {
     b2bLogger.error(error);
     return undefined;
   }
 
-  if (
-    !currentCustomerJWT ||
-    currentCustomerJWT?.includes('errors') ||
-    prevCurrentCustomerJWT === currentCustomerJWT
-  )
-    return undefined;
+  if (!currentCustomerJWT || prevCurrentCustomerJWT === currentCustomerJWT) return undefined;
 
   const data = await getB2BToken(currentCustomerJWT, channelId);
   const B2BToken = data.authorization.result.token as string;
@@ -262,21 +267,25 @@ const loginWithCurrentCustomerJWT = async () => {
   return { B2BToken, newLoginType };
 };
 
-export const getCurrentCustomerInfo: (b2bToken?: string) => Promise<
-  | {
-      role: any;
-      userType: any;
-      companyRoleName: string | any;
-    }
-  | undefined
-> = async (b2bToken?: string) => {
+interface CustomerInfo {
+  role: number;
+  userType: number;
+  companyRoleName: string;
+}
+
+export const getCurrentCustomerInfo = async (
+  b2bToken?: string,
+): Promise<CustomerInfo | undefined> => {
   const { B2BToken } = store.getState().company.tokens;
+
   let loginType = LoginTypes.GENERAL_LOGIN;
-  if (!(b2bToken || B2BToken)) {
+
+  if (!b2bToken && !B2BToken) {
     const data = await loginWithCurrentCustomerJWT();
     if (!data) return undefined;
     loginType = data.newLoginType;
   }
+
   try {
     const data = await getCustomerInfo();
 
@@ -296,7 +305,14 @@ export const getCurrentCustomerInfo: (b2bToken?: string) => Promise<
     const companyUserInfo = await getCompanyUserInfo();
 
     if (companyUserInfo && customerId) {
-      const { userType, role, id, companyRoleName, permissions } = companyUserInfo;
+      const { userType, id, companyRoleName, permissions } = companyUserInfo;
+
+      let { role } = companyUserInfo;
+
+      role =
+        role === CustomerRole.JUNIOR_BUYER && companyRoleName !== CustomerRoleName.JUNIOR_BUYER_NAME
+          ? CustomerRole.CUSTOM_ROLE
+          : role;
 
       const [companyInfo] = await Promise.all([
         getCompanyInfo(role, id, userType),
@@ -306,7 +322,7 @@ export const getCurrentCustomerInfo: (b2bToken?: string) => Promise<
       const isB2BUser =
         (userType === UserTypes.MULTIPLE_B2C &&
           companyInfo?.companyStatus === CompanyStatus.APPROVED) ||
-        +role === CustomerRole.SUPER_ADMIN;
+        Number(role) === CustomerRole.SUPER_ADMIN;
 
       const customerInfo = {
         id: customerId,
@@ -327,6 +343,40 @@ export const getCurrentCustomerInfo: (b2bToken?: string) => Promise<
         status: companyInfo.companyStatus,
         companyName: companyInfo.companyName,
       };
+
+      if (
+        role === CustomerRole.ADMIN ||
+        role === CustomerRole.SENIOR_BUYER ||
+        role === CustomerRole.JUNIOR_BUYER ||
+        role === CustomerRole.CUSTOM_ROLE
+      ) {
+        const isEnabledAccountHierarchy = await getAccountHierarchyIsEnabled();
+
+        if (isEnabledAccountHierarchy) {
+          const [{ companySubsidiaries }, { userMasqueradingCompany }] = await Promise.all([
+            getCompanySubsidiaries(),
+            getUserMasqueradingCompany(),
+          ]);
+
+          if (userMasqueradingCompany?.companyId) {
+            await endUserMasqueradingCompany();
+          }
+
+          store.dispatch(
+            setCompanyHierarchyInfoModules({
+              companyHierarchyAllList: companySubsidiaries,
+              isEnabledCompanyHierarchy: isEnabledAccountHierarchy,
+            }),
+          );
+        } else {
+          store.dispatch(
+            setCompanyHierarchyInfoModules({
+              isEnabledCompanyHierarchy: false,
+              companyHierarchyAllList: [],
+            }),
+          );
+        }
+      }
 
       store.dispatch(resetDraftQuoteList());
       store.dispatch(resetDraftQuoteInfo());

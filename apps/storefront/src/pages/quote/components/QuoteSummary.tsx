@@ -48,10 +48,10 @@ const QuoteSummary = forwardRef((_, ref: Ref<unknown>) => {
 
         const { shipping } = summary;
 
-        const price = getBCPrice(+basePrice, +productTax);
+        const price = getBCPrice(Number(basePrice), Number(productTax));
 
         subtotal += priceCalc(price * quantity);
-        tax += priceCalc(+productTax * +quantity);
+        tax += priceCalc(Number(productTax) * Number(quantity));
 
         const totalPrice = showInclusiveTaxPrice ? subtotal : subtotal + tax;
 
@@ -80,7 +80,7 @@ const QuoteSummary = forwardRef((_, ref: Ref<unknown>) => {
     refreshSummary: () => getSummary(),
   }));
 
-  const priceFormat = (price: number) => `${currencyFormat(price)}`;
+  const priceFormat = (price: number) => currencyFormat(price);
 
   const showPrice = (price: string | number): string | number => {
     if (isHideQuoteDraftPrice) return b3Lang('quoteDraft.quoteSummary.tbd');

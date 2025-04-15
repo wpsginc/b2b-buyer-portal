@@ -72,7 +72,7 @@ function HistoryList({ list }: { list: PaymentsHistoryList[] }) {
                 }}
               >
                 <Title title="Date received" />
-                <Typography variant="body1">{`${displayFormat(+createdAt)}`}</Typography>
+                <Typography variant="body1">{`${displayFormat(Number(createdAt))}`}</Typography>
               </Box>
               <Box
                 sx={{
@@ -81,7 +81,7 @@ function HistoryList({ list }: { list: PaymentsHistoryList[] }) {
               >
                 <Title title="Amount" />
                 <Typography variant="body1">
-                  {`${handleGetCorrespondingCurrency(amount.code, +(amount?.value || 0))}`}
+                  {handleGetCorrespondingCurrency(amount.code, Number(amount?.value || 0))}
                 </Typography>
               </Box>
               <Box
@@ -119,19 +119,19 @@ function HistoryList({ list }: { list: PaymentsHistoryList[] }) {
 function PaymentsHistory({ open, setOpen, currentInvoiceId }: PaymentsHistoryProps) {
   const b3Lang = useB3Lang();
   const [isMobile] = useMobile();
-  const [loadding, setLoadding] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const [list, setList] = useState<PaymentsHistoryList[] | []>([]);
 
   useEffect(() => {
     const init = async () => {
-      setLoadding(true);
+      setLoading(true);
       const {
         allReceiptLines: { edges = [] },
-      } = await getInvoicePaymentHistory(+currentInvoiceId);
+      } = await getInvoicePaymentHistory(Number(currentInvoiceId));
 
       setList(edges);
-      setLoadding(false);
+      setLoading(false);
     };
 
     if (open && currentInvoiceId) {
@@ -150,11 +150,11 @@ function PaymentsHistory({ open, setOpen, currentInvoiceId }: PaymentsHistoryPro
     >
       <Box
         sx={{
-          width: isMobile ? '100%' : `${'384px'}`,
+          width: isMobile ? '100%' : '384px',
           maxHeight: '600px',
         }}
       >
-        <B3Spin isSpinning={loadding}>
+        <B3Spin isSpinning={loading}>
           <Box
             sx={{
               display: 'flex',

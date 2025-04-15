@@ -126,7 +126,7 @@ export default function OrderOtherDetails() {
       const newDialogData = dialogData.find((data: DialogData) => data.type === name);
       setCurrentDialogData(newDialogData);
       if (invId) setNsId(invId);
-    } else if (!isAgenting && +role === 3) {
+    } else if (!isAgenting && Number(role) === 3) {
       snackbar.error(b3Lang('orderDetail.orderCard.errorMasquerade'));
     }
   };

@@ -4,12 +4,12 @@ import { Box, Grid } from '@mui/material';
 import { useMobile } from '@/hooks';
 import { isB2BUserSelector, rolePermissionSelector, useAppSelector } from '@/store';
 
+import QuickOrderTable from './components/QuickOrderB2BTable';
 import QuickOrderFooter from './components/QuickOrderFooter';
 import QuickOrderPad from './components/QuickOrderPad';
-import QuickorderTable from './components/QuickorderTable';
 import { CheckedProduct } from './utils';
 
-function Quickorder() {
+function QuickOrder() {
   const isB2BUser = useAppSelector(isB2BUserSelector);
 
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
@@ -53,7 +53,7 @@ function Quickorder() {
               pr: '16px',
             }}
           >
-            <QuickorderTable
+            <QuickOrderTable
               setCheckedArr={setCheckedArr}
               setIsRequestLoading={setIsRequestLoading}
               isRequestLoading={isRequestLoading}
@@ -63,7 +63,7 @@ function Quickorder() {
             item
             xs={isMobile ? 12 : 4}
             sx={{
-              pt: !isMobile ? '0px !important' : '16px',
+              pt: isMobile ? '16px' : '0px !important',
               pl: isMobile ? '0px !important' : '16px',
             }}
           >
@@ -91,4 +91,4 @@ function Quickorder() {
   );
 }
 
-export default Quickorder;
+export default QuickOrder;

@@ -2,7 +2,7 @@ import { forwardRef, Ref, useImperativeHandle, useRef, useState } from 'react';
 import { useB3Lang } from '@b3/lang';
 import { Box, styled, Typography } from '@mui/material';
 
-import { B3PaginationTable } from '@/components/table/B3PaginationTable';
+import { B3PaginationTable, GetRequestList } from '@/components/table/B3PaginationTable';
 import { TableColumnItem } from '@/components/table/B3Table';
 import { PRODUCT_DEFAULT_IMAGE } from '@/constants';
 import { useAppSelector } from '@/store';
@@ -10,10 +10,6 @@ import { currencyFormatConvert } from '@/utils';
 import { getBCPrice, getDisplayPrice } from '@/utils/b3Product/b3Product';
 
 import QuoteDetailTableCard from './QuoteDetailTableCard';
-
-interface ListItem {
-  [key: string]: string;
-}
 
 interface ProductInfoProps {
   basePrice: number | string;
@@ -43,10 +39,7 @@ interface ListItemProps {
 
 interface ShoppingDetailTableProps {
   total: number;
-  getQuoteTableDetails: (params: any) => Promise<{
-    edges: any[];
-    totalCount: number;
-  }>;
+  getQuoteTableDetails: GetRequestList<SearchProps, ProductInfoProps>;
   isHandleApprove: boolean;
   getTaxRate: (taxClassId: number, variants: any) => number;
   displayDiscount: boolean;
@@ -142,7 +135,7 @@ function QuoteDetailTable(props: ShoppingDetailTableProps, ref: Ref<unknown>) {
     }
     return price;
   };
-  const columnItems: TableColumnItem<ListItem>[] = [
+  const columnItems: TableColumnItem<ProductInfoProps>[] = [
     {
       key: 'Product',
       title: b3Lang('quoteDetail.table.product'),
@@ -234,16 +227,16 @@ function QuoteDetailTable(props: ShoppingDetailTableProps, ref: Ref<unknown>) {
 
         const taxRate = getTaxRate(taxClassId, variants);
         const taxPrice = enteredInclusiveTax
-          ? (+basePrice * taxRate) / (1 + taxRate)
-          : +basePrice * taxRate;
+          ? (Number(basePrice) * taxRate) / (1 + taxRate)
+          : Number(basePrice) * taxRate;
         const discountTaxPrice = enteredInclusiveTax
-          ? (+offeredPrice * taxRate) / (1 + taxRate)
-          : +offeredPrice * taxRate;
+          ? (Number(offeredPrice) * taxRate) / (1 + taxRate)
+          : Number(offeredPrice) * taxRate;
 
-        const price = getBCPrice(+basePrice, taxPrice);
-        const discountPrice = getBCPrice(+offeredPrice, discountTaxPrice);
+        const price = getBCPrice(Number(basePrice), taxPrice);
+        const discountPrice = getBCPrice(Number(offeredPrice), discountTaxPrice);
 
-        const isDiscount = +basePrice - +offeredPrice > 0 && displayDiscount;
+        const isDiscount = Number(basePrice) - Number(offeredPrice) > 0 && displayDiscount;
         return (
           <>
             {isDiscount && (
@@ -254,11 +247,11 @@ function QuoteDetailTable(props: ShoppingDetailTableProps, ref: Ref<unknown>) {
                 }}
               >
                 {showPrice(
-                  `${currencyFormatConvert(price, {
+                  currencyFormatConvert(price, {
                     currency,
                     isConversionRate: false,
                     useCurrentCurrency: !!currency,
-                  })}`,
+                  }),
                   row,
                 )}
               </Typography>
@@ -271,11 +264,11 @@ function QuoteDetailTable(props: ShoppingDetailTableProps, ref: Ref<unknown>) {
               }}
             >
               {showPrice(
-                `${currencyFormatConvert(discountPrice, {
+                currencyFormatConvert(discountPrice, {
                   currency,
                   isConversionRate: false,
                   useCurrentCurrency: !!currency,
-                })}`,
+                }),
                 row,
               )}
             </Typography>
@@ -317,18 +310,18 @@ function QuoteDetailTable(props: ShoppingDetailTableProps, ref: Ref<unknown>) {
 
         const taxRate = getTaxRate(taxClassId, variants);
         const taxPrice = enteredInclusiveTax
-          ? (+basePrice * taxRate) / (1 + taxRate)
-          : +basePrice * taxRate;
+          ? (Number(basePrice) * taxRate) / (1 + taxRate)
+          : Number(basePrice) * taxRate;
         const discountTaxPrice = enteredInclusiveTax
-          ? (+offeredPrice * taxRate) / (1 + taxRate)
-          : +offeredPrice * taxRate;
+          ? (Number(offeredPrice) * taxRate) / (1 + taxRate)
+          : Number(offeredPrice) * taxRate;
 
-        const price = getBCPrice(+basePrice, taxPrice);
-        const discountPrice = getBCPrice(+offeredPrice, discountTaxPrice);
-        const isDiscount = +basePrice - +offeredPrice > 0 && displayDiscount;
+        const price = getBCPrice(Number(basePrice), taxPrice);
+        const discountPrice = getBCPrice(Number(offeredPrice), discountTaxPrice);
+        const isDiscount = Number(basePrice) - Number(offeredPrice) > 0 && displayDiscount;
 
-        const total = price * +quantity;
-        const totalWithDiscount = discountPrice * +quantity;
+        const total = price * Number(quantity);
+        const totalWithDiscount = discountPrice * Number(quantity);
 
         return (
           <Box>
@@ -340,11 +333,11 @@ function QuoteDetailTable(props: ShoppingDetailTableProps, ref: Ref<unknown>) {
                 }}
               >
                 {showPrice(
-                  `${currencyFormatConvert(total, {
+                  currencyFormatConvert(total, {
                     currency,
                     isConversionRate: false,
                     useCurrentCurrency: !!currency,
-                  })}`,
+                  }),
                   row,
                 )}
               </Typography>
@@ -356,11 +349,11 @@ function QuoteDetailTable(props: ShoppingDetailTableProps, ref: Ref<unknown>) {
               }}
             >
               {showPrice(
-                `${currencyFormatConvert(totalWithDiscount, {
+                currencyFormatConvert(totalWithDiscount, {
                   currency,
                   isConversionRate: false,
                   useCurrentCurrency: !!currency,
-                })}`,
+                }),
                 row,
               )}
             </Typography>
@@ -405,7 +398,7 @@ function QuoteDetailTable(props: ShoppingDetailTableProps, ref: Ref<unknown>) {
         itemIsMobileSpacing={0}
         noDataText={b3Lang('quoteDetail.table.noProducts')}
         tableKey="productId"
-        renderItem={(row: ProductInfoProps, index?: number) => (
+        renderItem={(row, index) => (
           <QuoteDetailTableCard
             len={total || 0}
             item={row}

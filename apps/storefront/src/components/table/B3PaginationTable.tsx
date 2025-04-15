@@ -1,6 +1,5 @@
 import {
-  forwardRef,
-  memo,
+  FC,
   ReactElement,
   Ref,
   useCallback,
@@ -13,28 +12,53 @@ import isEmpty from 'lodash-es/isEmpty';
 import isEqual from 'lodash-es/isEqual';
 
 import { useMobile } from '@/hooks';
+import { useAppSelector } from '@/store';
+import { forwardRefWithGenerics, memoWithGenerics } from '@/utils';
 
-import { B3Table, TableColumnItem } from './B3Table';
+import {
+  B3Table,
+  isNodeWrapper,
+  PossibleNodeWrapper,
+  TableColumnItem,
+  WithRowControls,
+} from './B3Table';
 
 export interface TablePagination {
   offset: number;
   first: number;
 }
-interface B3PaginationTableProps {
+
+interface GetRequestListResult<T extends object> {
+  edges: PossibleNodeWrapper<T>[];
+  totalCount: number;
+}
+
+type GetRequestListSync<Params, Item extends object> = (
+  params: Params,
+) => GetRequestListResult<Item>;
+type GetRequestListAsync<Params, Item extends object> = (
+  params: Params,
+) => Promise<GetRequestListResult<Item>>;
+
+export type GetRequestList<Params, Item extends object> =
+  | GetRequestListSync<Params, Item>
+  | GetRequestListAsync<Params, Item>;
+
+interface B3PaginationTableProps<GetRequestListParams, Row extends object> {
   tableFixed?: boolean;
   tableHeaderHide?: boolean;
-  columnItems?: TableColumnItem<any>[];
+  columnItems?: TableColumnItem<Row>[];
   itemSpacing?: number;
   itemXs?: number;
   rowsPerPageOptions?: number[];
   showPagination?: boolean;
-  renderItem?: (row: any, index?: number, checkBox?: () => ReactElement) => ReactElement;
-  CollapseComponent?: (row: any) => ReactElement;
+  renderItem?: (row: Row, index?: number, checkBox?: () => ReactElement) => ReactElement;
+  CollapseComponent?: FC<{ row: Row }>;
   isCustomRender?: boolean;
   noDataText?: string;
   tableKey?: string;
-  getRequestList: any;
-  searchParams?: any;
+  getRequestList: GetRequestList<GetRequestListParams, WithRowControls<Row>>;
+  searchParams: GetRequestListParams & { createdBy?: string };
   requestLoading?: (bool: boolean) => void;
   showCheckbox?: boolean;
   showSelectAllCheckbox?: boolean;
@@ -47,15 +71,16 @@ interface B3PaginationTableProps {
   itemIsMobileSpacing?: number;
   disableCheckbox?: boolean;
   applyAllDisableCheckbox?: boolean;
-  onClickRow?: (item: any, index?: number) => void;
+  onClickRow?: (row: Row, index?: number) => void;
   showRowsPerPageOptions?: boolean;
   sortDirection?: 'asc' | 'desc';
   sortByFn?: (e: { key: string }) => void;
   orderBy?: string;
   pageType?: string;
+  isAutoRefresh?: boolean;
 }
 
-function PaginationTable(
+function PaginationTable<GetRequestListParams, Row extends object>(
   {
     columnItems,
     isCustomRender = false,
@@ -89,7 +114,8 @@ function PaginationTable(
     sortByFn = () => {},
     orderBy = '',
     pageType = '',
-  }: B3PaginationTableProps,
+    isAutoRefresh = true,
+  }: B3PaginationTableProps<GetRequestListParams, Row>,
   ref?: Ref<unknown>,
 ) {
   const initPagination = {
@@ -97,7 +123,12 @@ function PaginationTable(
     first: rowsPerPageOptions[0],
   };
 
-  const cache = useRef(null);
+  const { selectCompanyHierarchyId } = useAppSelector(
+    ({ company }) => company.companyHierarchyInfo,
+  );
+  const selectCompanyHierarchyIdCache = useRef(selectCompanyHierarchyId);
+
+  const cache = useRef<GetRequestListParams | null>(null);
 
   const [loading, setLoading] = useState<boolean>();
 
@@ -107,24 +138,25 @@ function PaginationTable(
 
   const [isAllSelect, setAllSelect] = useState<boolean>(false);
 
-  const [cacheAllList, setCacheAllList] = useState<Array<CustomFieldItems>>([]);
+  const [cacheAllList, setCacheAllList] = useState<PossibleNodeWrapper<WithRowControls<Row>>[]>([]);
 
-  const [list, setList] = useState<Array<CustomFieldItems>>([]);
+  const [list, setList] = useState<PossibleNodeWrapper<WithRowControls<Row>>[]>([]);
 
   const [selectCheckbox, setSelectCheckbox] = useState<Array<string | number>>([]);
 
   const [isMobile] = useMobile();
 
   const cacheList = useCallback(
-    (edges: Array<CustomFieldItems>) => {
+    (edges: PossibleNodeWrapper<WithRowControls<Row>>[]) => {
       if (!cacheAllList.length) setCacheAllList(edges);
 
       const copyCacheAllList = [...cacheAllList];
 
-      edges.forEach((item: CustomFieldItems) => {
-        const option = item?.node || item;
-        const isExist = cacheAllList.some((cache: CustomFieldItems) => {
-          const cacheOption = cache?.node || cache;
+      edges.forEach((item) => {
+        const option = isNodeWrapper(item) ? item.node : item;
+        const isExist = cacheAllList.some((cache) => {
+          const cacheOption = isNodeWrapper(cache) ? cache.node : cache;
+          // @ts-expect-error typed previously as an any
           return cacheOption[selectedSymbol] === option[selectedSymbol];
         });
 
@@ -148,7 +180,7 @@ function PaginationTable(
 
         setLoading(true);
         if (requestLoading) requestLoading(true);
-        const { createdBy } = searchParams;
+        const { createdBy = '' } = searchParams;
 
         const getEmailReg = /\((.+)\)/g;
         const getCreatedByReg = /^[^(]+/;
@@ -166,7 +198,7 @@ function PaginationTable(
           offset: b3Pagination?.offset || 0,
         };
         const requestList = await getRequestList(params);
-        const { edges, totalCount }: CustomFieldItems = requestList;
+        const { edges, totalCount } = requestList;
 
         setList(edges);
 
@@ -204,10 +236,20 @@ function PaginationTable(
   }, [fetchList, pagination]);
 
   useEffect(() => {
+    const isChangeCompany =
+      Number(selectCompanyHierarchyIdCache.current) !== Number(selectCompanyHierarchyId);
     if (!isEmpty(searchParams)) {
-      fetchList();
+      if (isChangeCompany) {
+        if (isAutoRefresh) fetchList(pagination, true);
+        selectCompanyHierarchyIdCache.current = selectCompanyHierarchyId;
+      } else {
+        if (isAutoRefresh && pageType === 'orderListPage') fetchList(pagination, true);
+        fetchList();
+      }
     }
-  }, [fetchList, searchParams]);
+    // ignore pageType because is not a reactive value
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchList, searchParams, selectCompanyHierarchyId, pagination, isAutoRefresh]);
 
   useEffect(() => {
     if (getSelectCheckbox) getSelectCheckbox(selectCheckbox);
@@ -251,9 +293,10 @@ function PaginationTable(
 
   const getCurrentAllItemsSelect = useCallback(() => {
     if (!selectCheckbox.length) return false;
-    return list.every((item: CustomFieldItems) => {
-      const option = item?.node || item;
+    return list.every((item) => {
+      const option = isNodeWrapper(item) ? item.node : item;
 
+      // @ts-expect-error typed previously as an any
       return selectCheckbox.includes(option[selectedSymbol]);
     });
   }, [list, selectCheckbox, selectedSymbol]);
@@ -271,14 +314,16 @@ function PaginationTable(
         setSelectCheckbox([]);
       } else {
         const selects: Array<string | number> = [];
-        list.forEach((item: CustomFieldItems) => {
-          const option = item?.node || item;
+        list.forEach((item) => {
+          const option = isNodeWrapper(item) ? item.node : item;
           if (option) {
             if (pageType === 'shoppingListDetailsTable') {
               selects.push(
+                // @ts-expect-error typed previously as an any
                 option.quantity > 0 || !option.disableCurrentCheckbox ? option[selectedSymbol] : '',
               );
             } else {
+              // @ts-expect-error typed previously as an any
               selects.push(option[selectedSymbol]);
             }
           }
@@ -292,15 +337,18 @@ function PaginationTable(
 
       const newSelectCheckbox = [...selectCheckbox];
       if (flag) {
-        list.forEach((item: CustomFieldItems) => {
-          const option = item?.node || item;
-          const index = newSelectCheckbox.findIndex((item: any) => item === option[selectedSymbol]);
+        list.forEach((item) => {
+          const option = isNodeWrapper(item) ? item.node : item;
+          // @ts-expect-error typed previously as an any
+          const index = newSelectCheckbox.findIndex((item) => item === option[selectedSymbol]);
           newSelectCheckbox.splice(index, 1);
         });
       } else {
-        list.forEach((item: CustomFieldItems) => {
-          const option = item?.node || item;
+        list.forEach((item: PossibleNodeWrapper<Row>) => {
+          const option = isNodeWrapper(item) ? item.node : item;
+          // @ts-expect-error typed previously as an any
           if (!selectCheckbox.includes(option[selectedSymbol])) {
+            // @ts-expect-error typed previously as an any
             newSelectCheckbox.push(option[selectedSymbol]);
           }
         });
@@ -369,6 +417,6 @@ function PaginationTable(
   );
 }
 
-const B3PaginationTable = memo(forwardRef(PaginationTable));
+const B3PaginationTable = memoWithGenerics(forwardRefWithGenerics(PaginationTable));
 
 export { B3PaginationTable };

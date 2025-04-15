@@ -1,14 +1,14 @@
 import { useContext, useEffect, useRef } from 'react';
-import { useB3Lang } from '@b3/lang';
 import Cookies from 'js-cookie';
 
 import { HeadlessRoutes } from '@/constants';
 import { addProductFromPage as addProductFromPageToShoppingList } from '@/hooks/dom/useOpenPDP';
 import { addProductsFromCartToQuote, addProductsToDraftQuote } from '@/hooks/dom/utils';
-import { addProductsToShoppingList } from '@/pages/PDP';
+import { addProductsToShoppingList, useAddedToShoppingListAlert } from '@/pages/PDP';
 import { type SetOpenPage } from '@/pages/SetOpenPage';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
+import { getAllowedRoutesWithoutComponent } from '@/shared/routeList';
 import { superAdminCompanies } from '@/shared/service/b2b';
 import B3Request from '@/shared/service/request/b3Fetch';
 import {
@@ -20,6 +20,8 @@ import {
 import { setB2BToken } from '@/store/slices/company';
 import { QuoteItem } from '@/types/quotes';
 import CallbackManager from '@/utils/b3CallbackManager';
+import b2bLogger from '@/utils/b3Logger';
+import { logoutSession } from '@/utils/b3logout';
 import { LineItems } from '@/utils/b3Product/b3Product';
 import createShoppingList from '@/utils/b3ShoppingList/b3ShoppingList';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
@@ -60,22 +62,30 @@ const Manager = new CallbackManager();
 
 export default function HeadlessController({ setOpenPage }: HeadlessControllerProps) {
   const storeDispatch = useAppDispatch();
-  const b3Lang = useB3Lang();
 
-  const {
-    state: { registerEnabled, productQuoteEnabled, cartQuoteEnabled, shoppingListEnabled },
-  } = useContext(GlobaledContext);
+  const { state: globalState } = useContext(GlobalContext);
   const isB2BUser = useAppSelector(isB2BUserSelector);
   const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
   const customer = useAppSelector(({ company }) => company.customer);
   const role = useAppSelector(({ company }) => company.customer.role);
   const productList = useAppSelector(formattedQuoteDraftListSelector);
+  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
   const B2BToken = useAppSelector(({ company }) => company.tokens.B2BToken);
+
+  const displayAddedToShoppingListAlert = useAddedToShoppingListAlert();
 
   const {
     state: { addQuoteBtn, shoppingListBtn, addToAllQuoteBtn },
   } = useContext(CustomStyleContext);
-  const { addToQuote: addProductsFromCart } = addProductsFromCartToQuote(setOpenPage);
+  const { addToQuoteFromCart, addToQuoteFromCookie } = addProductsFromCartToQuote(setOpenPage);
+
+  const {
+    registerEnabled,
+    productQuoteEnabled,
+    cartQuoteEnabled,
+    shoppingListEnabled,
+    quoteConfig,
+  } = globalState;
 
   const saveFn = () => {
     setOpenPage({
@@ -83,22 +93,13 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
       openUrl: '/register',
     });
   };
-  const gotoShoppingDetail = (id: number | string) => {
-    setOpenPage({
-      isOpen: true,
-      openUrl: `/shoppingList/${id}`,
-      params: {
-        shoppingListBtn: 'add',
-      },
-    });
-  };
 
   const customerId = customer.id;
   // Keep updated values
-  const salesRepCompanyIdRef = useRef(+salesRepCompanyId);
+  const salesRepCompanyIdRef = useRef(Number(salesRepCompanyId));
   const customerIdRef = useRef(customerId);
   const customerRef = useRef(customer);
-  const roleRef = useRef(+role);
+  const roleRef = useRef(Number(role));
   const isB2BUserRef = useRef(isB2BUser);
   const productQuoteEnabledRef = useRef(productQuoteEnabled);
   const shoppingListEnabledRef = useRef(shoppingListEnabled);
@@ -107,10 +108,10 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
   const shoppingListBtnRef = useRef(shoppingListBtn);
   const addToAllQuoteBtnRef = useRef(addToAllQuoteBtn);
 
-  salesRepCompanyIdRef.current = +salesRepCompanyId;
+  salesRepCompanyIdRef.current = Number(salesRepCompanyId);
   customerIdRef.current = customerId;
   customerRef.current = customer;
-  roleRef.current = +role;
+  roleRef.current = Number(role);
   isB2BUserRef.current = isB2BUser;
   productQuoteEnabledRef.current = productQuoteEnabled;
   shoppingListEnabledRef.current = shoppingListEnabled;
@@ -124,18 +125,22 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
       ...window.b2b,
       callbacks: Manager,
       utils: {
+        getRoutes: () => getAllowedRoutesWithoutComponent(globalState),
         openPage: (page) =>
           setTimeout(() => {
             if (page === 'CLOSE') {
               setOpenPage({ isOpen: false });
               return;
             }
-            setOpenPage({ isOpen: true, openUrl: HeadlessRoutes[page] });
+            const openUrl = page.startsWith('/') ? page : HeadlessRoutes[page];
+            setOpenPage({ isOpen: true, openUrl });
           }, 0),
         quote: {
           addProductFromPage: (item) => addProductsToDraftQuote([item], setOpenPage),
-          addProductsFromCart: () => addProductsFromCart(),
+          addProductsFromCart: addToQuoteFromCookie,
+          addProductsFromCartId: addToQuoteFromCart,
           addProducts: (items) => addProductsToDraftQuote(items, setOpenPage),
+          getQuoteConfigs: () => quoteConfig,
           getCurrent: () => ({ productList }),
           getButtonInfo: () => ({
             ...addQuoteBtnRef.current,
@@ -182,9 +187,22 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
             endMasquerade();
           },
           graphqlBCProxy: B3Request.graphqlBCProxy,
-          loginWithB2BStorefrontToken: async (b2bStorefrontJWTToken: string) => {
-            storeDispatch(setB2BToken(b2bStorefrontJWTToken));
-            await getCurrentCustomerInfo(b2bStorefrontJWTToken);
+          loginWithB2BStorefrontToken: async (token: string) => {
+            storeDispatch(setB2BToken(token));
+            await getCurrentCustomerInfo(token);
+          },
+          logout: async () => {
+            try {
+              if (isAgenting) {
+                await endMasquerade();
+              }
+            } catch (e) {
+              b2bLogger.error(e);
+            } finally {
+              window.sessionStorage.clear();
+              logoutSession();
+              window.b2b.callbacks.dispatchEvent('on-logout');
+            }
           },
         },
         shoppingList: {
@@ -206,9 +224,7 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
               items: transformOptionSelectionsToAttributes(items),
               isB2BUser: isB2BUserRef.current,
               customerGroupId: customerRef.current.customerGroupId,
-              gotoShoppingDetail,
-              b3Lang,
-            }),
+            }).then(() => displayAddedToShoppingListAlert(shoppingListId.toString())),
           createNewShoppingList: async (name, description) => {
             const { shoppingListsCreate } = await createShoppingList({
               data: { name, description },
@@ -232,7 +248,7 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
     };
     // disabling because we don't want to run this effect on every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productList, B2BToken]);
+  }, [productList, B2BToken, globalState, quoteConfig]);
 
   return null;
 }

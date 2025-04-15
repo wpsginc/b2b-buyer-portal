@@ -1,0 +1,11 @@
+{
+  "scopes": [
+    "common",
+    "companies",
+    "quotes",
+    "permissions",
+    "account",
+    "shopping-lists",
+    "orders"
+  ]
+}

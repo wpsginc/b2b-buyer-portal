@@ -7,7 +7,7 @@ import { B3CustomForm } from '@/components';
 import { Captcha } from '@/components/form';
 import { getContrastColor } from '@/components/outSideComponents/utils/b3CustomStyles';
 import { CustomStyleContext } from '@/shared/customStyleButton/context';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   createB2BCompanyUser,
   createBCCompanyUser,
@@ -18,24 +18,22 @@ import { getStorefrontToken } from '@/shared/service/b2b/graphql/recaptcha';
 import { channelId, storeHash } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
 
-import RegisteredStepButton from './component/RegisteredStepButton';
 import { RegisteredContext } from './context/RegisteredContext';
 import { deCodeField, toHump } from './config';
+import { PrimaryButton } from './PrimaryButton';
 import { InformationFourLabels, TipContent } from './styled';
 import { RegisterFields } from './types';
 
 interface RegisterCompleteProps {
   handleBack: () => void;
   handleNext: () => void;
-  activeStep: number;
 }
 
 type RegisterCompleteList = Array<RegisterFields> | undefined;
 
 export default function RegisterComplete(props: RegisterCompleteProps) {
   const b3Lang = useB3Lang();
-  const { handleBack, activeStep, handleNext } = props;
-
+  const { handleBack, handleNext } = props;
   const [personalInfo, setPersonalInfo] = useState<Array<CustomFieldItems>>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [enterEmail, setEnterEmail] = useState<string>('');
@@ -81,7 +79,7 @@ export default function RegisterComplete(props: RegisterCompleteProps) {
 
   const {
     state: { blockPendingAccountOrderCreation },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const {
     state: {
@@ -437,7 +435,7 @@ export default function RegisterComplete(props: RegisterCompleteProps) {
             const accountInfo = await getB2BFieldsValue(completeData, data.id, fileList);
 
             const companyStatus = accountInfo?.companyCreate?.company?.companyStatus || '';
-            isAuto = +companyStatus === 1;
+            isAuto = Number(companyStatus) === 1;
           }
           dispatch({
             type: 'finishInfo',
@@ -551,12 +549,18 @@ export default function RegisterComplete(props: RegisterCompleteProps) {
           ''
         )}
       </Box>
-      <RegisteredStepButton
-        handleBack={handleBack}
-        activeStep={activeStep}
-        handleNext={handleCompleted}
-        email={enterEmail}
-      />
+
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          pt: 2,
+          gap: 1,
+        }}
+      >
+        <PrimaryButton onClick={handleBack}>{b3Lang('global.button.back')}</PrimaryButton>
+        <PrimaryButton onClick={handleCompleted}>{b3Lang('global.button.submit')}</PrimaryButton>
+      </Box>
     </Box>
   );
 }

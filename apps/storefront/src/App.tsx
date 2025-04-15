@@ -1,4 +1,4 @@
-import { lazy, useContext, useEffect, useState } from 'react';
+import { lazy, useContext, useEffect, useMemo, useState } from 'react';
 import { HashRouter } from 'react-router-dom';
 
 import { usePageMask } from '@/components';
@@ -7,11 +7,11 @@ import B3RenderRouter from '@/components/layout/B3RenderRouter';
 import { useB3AppOpen, useSetOpen } from '@/hooks';
 import useDomHooks from '@/hooks/dom/useDomHooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import { gotoAllowedAppPage } from '@/shared/routes';
 import { setChannelStoreType } from '@/shared/service/b2b';
-import { CustomerRole } from '@/types';
 import {
+  b2bJumpPath,
   getQuoteEnabled,
   handleHideRegisterPage,
   hideStorefrontElement,
@@ -28,11 +28,11 @@ import {
   getTemPlateConfig,
   setStorefrontConfig,
 } from './utils/storefrontConfig';
-import { CHECKOUT_URL } from './constants';
+import { CHECKOUT_URL, PATH_ROUTES } from './constants';
 import {
   isB2BUserSelector,
   rolePermissionSelector,
-  setGlabolCommonState,
+  setGlobalCommonState,
   setOpenPageReducer,
   useAppDispatch,
   useAppSelector,
@@ -42,8 +42,12 @@ const B3GlobalTip = lazy(() => import('@/components/B3GlobalTip'));
 
 const B3HoverButton = lazy(() => import('@/components/outSideComponents/B3HoverButton'));
 
-const B3MasquradeGobalTip = lazy(
-  () => import('@/components/outSideComponents/B3MasquradeGobalTip'),
+const B3MasqueradeGlobalTip = lazy(
+  () => import('@/components/outSideComponents/B3MasqueradeGlobalTip'),
+);
+
+const B3CompanyHierarchyExternalButton = lazy(
+  () => import('@/components/outSideComponents/B3CompanyHierarchyExternalButton'),
 );
 
 const HeadlessController = lazy(() => import('@/components/HeadlessController'));
@@ -57,7 +61,7 @@ export default function App() {
   const {
     state: { quoteConfig, storefrontConfig, productQuoteEnabled, registerEnabled },
     dispatch,
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const isB2BUser = useAppSelector(isB2BUserSelector);
   const storeDispatch = useAppDispatch();
@@ -71,33 +75,17 @@ export default function App() {
   const currentClickedUrl = useAppSelector(({ global }) => global.currentClickedUrl);
   const isRegisterAndLogin = useAppSelector(({ global }) => global.isRegisterAndLogin);
   const bcGraphqlToken = useAppSelector(({ company }) => company.tokens.bcGraphqlToken);
-  const companyRoleName = useAppSelector((state) => state.company.customer.companyRoleName);
+  const { quotesCreateActionsPermission, shoppingListCreateActionsPermission } =
+    useAppSelector(rolePermissionSelector);
 
-  const b2bPermissions = useAppSelector(rolePermissionSelector);
-
-  const { getShoppingListPermission, getOrderPermission } = b2bPermissions;
-  const [authorizedPages, setAuthorizedPages] = useState<string>('/orders');
-  const IsRealJuniorBuyer =
-    +role === CustomerRole.JUNIOR_BUYER && companyRoleName === 'Junior Buyer';
-
-  useEffect(() => {
-    let currentAuthorizedPages = authorizedPages;
-
-    if (isB2BUser) {
-      currentAuthorizedPages = getShoppingListPermission ? '/shoppingLists' : '/accountSettings';
-
-      if (getOrderPermission)
-        currentAuthorizedPages = IsRealJuniorBuyer ? currentAuthorizedPages : '/orders';
-    }
-
-    setAuthorizedPages(currentAuthorizedPages);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [IsRealJuniorBuyer, getShoppingListPermission, getOrderPermission]);
+  const authorizedPages = useMemo(() => {
+    return isB2BUser ? b2bJumpPath(role) : PATH_ROUTES.ORDERS;
+  }, [role, isB2BUser]);
 
   const handleAccountClick = (href: string, isRegisterAndLogin: boolean) => {
     showPageMask(true);
     storeDispatch(
-      setGlabolCommonState({
+      setGlobalCommonState({
         isClickEnterBtn: true,
         currentClickedUrl: href,
         isRegisterAndLogin,
@@ -142,7 +130,7 @@ export default function App() {
       },
     });
 
-    if (/login.php/.test(pathname) && !href.includes('change_password')) {
+    if (pathname.includes('login.php') && !href.includes('change_password')) {
       dispatch({
         type: 'common',
         payload: {
@@ -155,7 +143,7 @@ export default function App() {
         openUrl = '/register';
       }
       if (/action=reset_password/.test(search)) {
-        openUrl = '/forgotpassword';
+        openUrl = '/forgotPassword';
       }
 
       setOpenPage({
@@ -202,7 +190,7 @@ export default function App() {
       }
 
       const userInfo = {
-        role: +role,
+        role: Number(role),
         isAgenting,
       };
 
@@ -215,7 +203,7 @@ export default function App() {
 
       // background login enter judgment and refresh
       if (!href.includes('checkout') && !(customerId && !window.location.hash)) {
-        await gotoAllowedAppPage(+userInfo.role, gotoPage);
+        await gotoAllowedAppPage(Number(userInfo.role), gotoPage);
       } else {
         showPageMask(false);
       }
@@ -225,7 +213,7 @@ export default function App() {
       }
 
       storeDispatch(
-        setGlabolCommonState({
+        setGlobalCommonState({
           isPageComplete: true,
         }),
       );
@@ -233,7 +221,7 @@ export default function App() {
 
     init();
     // ignore dispatch, gotoPage, loginAndRegister, setOpenPage, storeDispatch, styleDispatch
-    // due they are funtions that do not depend on any reactive value
+    // due they are functions that do not depend on any reactive value
     // ignore href because is not a reactive value
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b2bId, customerId, emailAddress, isAgenting, isB2BUser, role]);
@@ -246,9 +234,15 @@ export default function App() {
       dispatch({
         type: 'common',
         payload: {
-          productQuoteEnabled,
-          cartQuoteEnabled,
-          shoppingListEnabled,
+          productQuoteEnabled: isB2BUser
+            ? productQuoteEnabled && quotesCreateActionsPermission
+            : productQuoteEnabled,
+          cartQuoteEnabled: isB2BUser
+            ? cartQuoteEnabled && quotesCreateActionsPermission
+            : cartQuoteEnabled,
+          shoppingListEnabled: isB2BUser
+            ? shoppingListEnabled && shoppingListCreateActionsPermission
+            : shoppingListEnabled,
           registerEnabled,
         },
       });
@@ -258,15 +252,23 @@ export default function App() {
     }
     if (isB2BUser) hideStorefrontElement('dom.hideThemePayments');
 
-    // ignore dispatch due it's funtion that doesn't not depend on any reactive value
+    // ignore dispatch due it's function that doesn't not depend on any reactive value
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isB2BUser, isAgenting, role, quoteConfig, storefrontConfig]);
+  }, [
+    isB2BUser,
+    isAgenting,
+    role,
+    quoteConfig,
+    storefrontConfig,
+    quotesCreateActionsPermission,
+    shoppingListCreateActionsPermission,
+  ]);
 
   useEffect(() => {
     if (isOpen) {
       showPageMask(false);
     }
-    // ignore dispatch due it's funtion that doesn't not depend on any reactive value
+    // ignore dispatch due it's function that doesn't not depend on any reactive value
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -280,7 +282,6 @@ export default function App() {
           role,
           isRegisterAndLogin,
           isAgenting,
-          IsRealJuniorBuyer,
           authorizedPages,
         });
 
@@ -293,7 +294,7 @@ export default function App() {
 
         showPageMask(false);
         storeDispatch(
-          setGlabolCommonState({
+          setGlobalCommonState({
             isClickEnterBtn: false,
           }),
         );
@@ -302,7 +303,7 @@ export default function App() {
 
     init();
     // ignore dispatch, setOpenPage, and storeDispatch
-    // due they are funtions that do not depend on any reactive value
+    // due they are functions that do not depend on any reactive value
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentClickedUrl, isAgenting, isClickEnterBtn, isPageComplete, isRegisterAndLogin, role]);
 
@@ -312,7 +313,7 @@ export default function App() {
     if (!hash.includes('login') && !hash.includes('register')) {
       const recordOpenHash = isOpen ? hash : '';
       storeDispatch(
-        setGlabolCommonState({
+        setGlobalCommonState({
           recordOpenHash,
         }),
       );
@@ -329,7 +330,7 @@ export default function App() {
       showPageMask(false);
     }
     // ignore setOpenPage ad storeDispatch
-    // due they are funtions that do not depend on any reactive value
+    // due they are functions that do not depend on any reactive value
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -344,7 +345,7 @@ export default function App() {
       window.removeEventListener('hashchange', handleHashChange);
     };
     // ignore setOpenPage
-    // due they are funtions that do not depend on any reactive value
+    // due they are functions that do not depend on any reactive value
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -371,7 +372,8 @@ export default function App() {
           </ThemeFrame>
         </div>
       </HashRouter>
-      <B3MasquradeGobalTip setOpenPage={setOpenPage} isOpen={isOpen} />
+      <B3MasqueradeGlobalTip setOpenPage={setOpenPage} isOpen={isOpen} />
+      <B3CompanyHierarchyExternalButton setOpenPage={setOpenPage} isOpen={isOpen} />
       <B3HoverButton
         isOpen={isOpen}
         productQuoteEnabled={productQuoteEnabled}

@@ -1,10 +1,10 @@
-import { ReactNode, useContext, useEffect, useState } from 'react';
+import { ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
 import { Box, useMediaQuery } from '@mui/material';
 
 import useMobile from '@/hooks/useMobile';
-import { DynamicallyVariableedContext } from '@/shared/dynamicallyVariable';
+import { DynamicallyVariableContext } from '@/shared/dynamicallyVariable';
 import { getIsTokenGotoPage, routes } from '@/shared/routes';
 import { useAppSelector } from '@/store';
 
@@ -13,7 +13,7 @@ import CompanyCredit from '../CompanyCredit';
 
 import B3CloseAppButton from './B3CloseAppButton';
 import B3Logo from './B3Logo';
-import B3Mainheader from './B3Mainheader';
+import B3MainHeader from './B3MainHeader';
 import B3MobileLayout from './B3MobileLayout';
 import B3Nav from './B3Nav';
 
@@ -39,7 +39,7 @@ export default function B3Layout({ children }: { children: ReactNode }) {
   const {
     state: { globalMessageDialog },
     dispatch,
-  } = useContext(DynamicallyVariableedContext);
+  } = useContext(DynamicallyVariableContext);
 
   const navigate = useNavigate();
 
@@ -47,9 +47,7 @@ export default function B3Layout({ children }: { children: ReactNode }) {
     if ((!emailAddress || !customerId) && !getIsTokenGotoPage(location.pathname)) {
       navigate('/login');
     }
-    // disabling cause navigate dispatcher is not necessary here
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailAddress, customerId, location]);
+  }, [emailAddress, customerId, location, navigate]);
 
   useEffect(() => {
     const itemsRoutes = routes.find((item) => item.path === location.pathname);
@@ -91,19 +89,22 @@ export default function B3Layout({ children }: { children: ReactNode }) {
     });
   };
 
+  const overflowStyle = useMemo(() => {
+    const overflowXHiddenPage = ['/invoice'];
+    if (overflowXHiddenPage.includes(location.pathname)) {
+      return {
+        overflowX: 'hidden',
+      };
+    }
+
+    return {};
+  }, [location]);
+
   return (
     <Box>
       {isMobile ? (
         <B3MobileLayout title={title}>{children}</B3MobileLayout>
       ) : (
-        // <Box
-        //   sx={{
-        //     p: '40px 30px',
-        //     minHeight: '100vh',
-        //     display: 'flex',
-        //     backgroundColor: '#d2d2d3',
-        //   }}
-        // >
         <Box
           id="app-mainPage-layout"
           sx={{
@@ -144,9 +145,10 @@ export default function B3Layout({ children }: { children: ReactNode }) {
               maxWidth: '1450px',
               width: '100%',
               p: '0 0px 0px 50px',
+              ...overflowStyle,
             }}
           >
-            <B3Mainheader title={title} />
+            <B3MainHeader title={title} />
             <CompanyCredit />
             <Box
               component="main"
@@ -158,8 +160,6 @@ export default function B3Layout({ children }: { children: ReactNode }) {
             </Box>
           </Box>
         </Box>
-
-        // </Box>
       )}
 
       <B3Dialog
@@ -174,8 +174,8 @@ export default function B3Layout({ children }: { children: ReactNode }) {
         <Box
           sx={{
             display: 'flex',
-            justifyContent: `${isMobile ? 'center' : 'start'}`,
-            width: `${isMobile ? '100%' : '450px'}`,
+            justifyContent: isMobile ? 'center' : 'start',
+            width: isMobile ? '100%' : '450px',
             height: '100%',
           }}
         >

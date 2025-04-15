@@ -1,12 +1,11 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useB3Lang } from '@b3/lang';
 import { Box, Grid, useTheme } from '@mui/material';
-import isEmpty from 'lodash-es/isEmpty';
 
 import B3Spin from '@/components/spin/B3Spin';
 import { useMobile } from '@/hooks';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import {
   deleteB2BShoppingListItem,
   deleteBcShoppingListItem,
@@ -24,7 +23,10 @@ import {
   rolePermissionSelector,
   useAppSelector,
 } from '@/store';
-import { channelId, getB3PermissionsList, snackbar } from '@/utils';
+import { CustomerRole } from '@/types/company';
+import { ShoppingListStatus } from '@/types/shoppingList';
+import { channelId, snackbar, verifyLevelPermission } from '@/utils';
+import { b2bPermissionsMap } from '@/utils/b3CheckPermissions/config';
 import { calculateProductListPrice, getBCPrice } from '@/utils/b3Product/b3Product';
 import {
   conversionProductsList,
@@ -60,43 +62,116 @@ interface UpdateShoppingListParamsProps {
   channelId?: number;
 }
 
-interface PermissionLevelInfoProps {
-  permissionType: string;
-  permissionLevel?: number | string;
-}
+const calculateSubTotal = (checkedArr: CustomFieldItems) => {
+  if (checkedArr.length > 0) {
+    let total = 0.0;
 
-// shoppingList status: 0 -- Approved; 20 -- Rejected; 30 -- Draft; 40 -- Ready for approval
-// 0: Admin, 1: Senior buyer, 2: Junior buyer, 3: Super admin
+    checkedArr.forEach((item: ListItemProps) => {
+      const {
+        node: { quantity, basePrice, taxPrice },
+      } = item;
 
-function ShoppingListDetails({ setOpenPage }: PageProps) {
+      const price = getBCPrice(Number(basePrice), Number(taxPrice));
+
+      total += price * Number(quantity);
+    });
+
+    return (1000 * total) / 1000;
+  }
+  return 0.0;
+};
+
+function useData() {
   const { id = '' } = useParams();
   const {
     state: { openAPPParams, productQuoteEnabled = false },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
   const isB2BUser = useAppSelector(isB2BUserSelector);
   const { currency_code: currencyCode } = useAppSelector(activeCurrencyInfoSelector);
   const role = useAppSelector(({ company }) => company.customer.role);
-  const companyInfoId = useAppSelector(({ company }) => company.companyInfo.id);
+  const companyId = useAppSelector(({ company }) => company.companyInfo.id);
   const customerGroupId = useAppSelector(({ company }) => company.customer.customerGroupId);
-  const permissions = useAppSelector(({ company }) => company.permissions);
 
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
+
+  const theme = useTheme();
+  const primaryColor = theme.palette.primary.main;
+
+  const {
+    shoppingListCreateActionsPermission,
+    purchasabilityPermission,
+    submitShoppingListPermission,
+  } = useAppSelector(rolePermissionSelector);
+
+  const isCanAddToCart = isB2BUser ? purchasabilityPermission : true;
+
+  const getProducts = async (productIds: number[]) => {
+    const options = { productIds, currencyCode, companyId, customerGroupId };
+    const { productsSearch } = isB2BUser
+      ? await searchB2BProducts(options)
+      : await searchBcProducts(options);
+
+    return conversionProductsList(productsSearch);
+  };
+
+  const getShoppingList = (params: SearchProps) => {
+    const options = { ...params, id };
+
+    return isB2BUser ? getB2BShoppingListDetails(options) : getBcShoppingListDetails(options);
+  };
+
+  const deleteShoppingListItem = (itemId: string | number) => {
+    const options = { itemId, shoppingListId: id };
+
+    return isB2BUser ? deleteB2BShoppingListItem(options) : deleteBcShoppingListItem(options);
+  };
+
+  return {
+    id,
+    openAPPParams,
+    productQuoteEnabled,
+    isB2BUser,
+    role,
+    isAgenting,
+    primaryColor,
+    shoppingListCreateActionsPermission,
+    submitShoppingListPermission,
+    isCanAddToCart,
+    getProducts,
+    getShoppingList,
+    deleteShoppingListItem,
+  };
+}
+
+// 0: Admin, 1: Senior buyer, 2: Junior buyer, 3: Super admin
+
+function ShoppingListDetails({ setOpenPage }: PageProps) {
+  const {
+    id,
+    openAPPParams,
+    productQuoteEnabled,
+    isB2BUser,
+    role,
+    isAgenting,
+    primaryColor,
+    shoppingListCreateActionsPermission,
+    submitShoppingListPermission,
+    isCanAddToCart,
+    getProducts,
+    getShoppingList,
+    deleteShoppingListItem,
+  } = useData();
   const navigate = useNavigate();
   const [isMobile] = useMobile();
   const { dispatch } = useContext(ShoppingListDetailsContext);
 
-  const theme = useTheme();
-
   const b3Lang = useB3Lang();
-
-  const primaryColor = theme.palette.primary.main;
 
   const tableRef = useRef<TableRefProps | null>(null);
 
   const [checkedArr, setCheckedArr] = useState<CustomFieldItems>([]);
   const [shoppingListInfo, setShoppingListInfo] = useState<null | ShoppingListInfoProps>(null);
   const [customerInfo, setCustomerInfo] = useState<null | CustomerInfoProps>(null);
-  const [selectedSubTotal, setSelectedSubTotal] = useState<number>(0.0);
   const [isRequestLoading, setIsRequestLoading] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
@@ -108,18 +183,38 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
   const [allowJuniorPlaceOrder, setAllowJuniorPlaceOrder] = useState<boolean>(false);
   const [isCanEditShoppingList, setIsCanEditShoppingList] = useState<boolean>(true);
 
-  const { shoppingListActionsPermission, purchasabilityPermission, submitShoppingListPermission } =
-    useAppSelector(rolePermissionSelector);
   const b2bAndBcShoppingListActionsPermissions = isB2BUser
-    ? shoppingListActionsPermission && isCanEditShoppingList
+    ? shoppingListCreateActionsPermission && isCanEditShoppingList
     : true;
 
-  const isCanAddToCart = isB2BUser ? purchasabilityPermission : true;
-  const b2bSubmitShoppingListPermission = isB2BUser ? submitShoppingListPermission : role === 2;
+  const submitShoppingList = useMemo(() => {
+    if (isB2BUser && shoppingListInfo) {
+      const { companyInfo, customerInfo } = shoppingListInfo;
+      const { submitShoppingListPermission: submitShoppingListPermissionCode } = b2bPermissionsMap;
+      const submitShoppingListPermissionLevel = verifyLevelPermission({
+        code: submitShoppingListPermissionCode,
+        companyId: Number(companyInfo?.companyId || 0),
+        userId: Number(customerInfo?.userId || 0),
+      });
 
-  const isJuniorApprove = shoppingListInfo?.status === 0 && b2bSubmitShoppingListPermission;
+      return submitShoppingListPermissionLevel;
+    }
 
-  const isReadForApprove = shoppingListInfo?.status === 40 || shoppingListInfo?.status === 20;
+    return submitShoppingListPermission;
+  }, [submitShoppingListPermission, isB2BUser, shoppingListInfo]);
+  const b2bSubmitShoppingListPermission = isB2BUser
+    ? submitShoppingList
+    : role === CustomerRole.JUNIOR_BUYER;
+
+  const isJuniorApprove =
+    shoppingListInfo?.status === ShoppingListStatus.Approved && b2bSubmitShoppingListPermission;
+
+  const isReadForApprove =
+    shoppingListInfo?.status === ShoppingListStatus.ReadyForApproval ||
+    shoppingListInfo?.status === ShoppingListStatus.Rejected ||
+    // Status code 20 was previously misused as Rejected in the frontend, which is actually Deleted
+    // We need to add Deleted here so that the shopping lists that were previously rejected remain the same behavior
+    shoppingListInfo?.status === ShoppingListStatus.Deleted;
 
   const goToShoppingLists = () => {
     navigate('/shoppingLists');
@@ -132,7 +227,7 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
         id: parseInt(id, 10) || 0,
       },
     });
-    // disabling as we dont need a dispatcher here
+    // disabling as we don't need a dispatcher here
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -146,16 +241,8 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
             productIds.push(node.productId);
           }
         });
-        const getProducts = isB2BUser ? searchB2BProducts : searchBcProducts;
 
-        const { productsSearch } = await getProducts({
-          productIds,
-          currencyCode,
-          companyId: companyInfoId,
-          customerGroupId,
-        });
-
-        const newProductsSearch = conversionProductsList(productsSearch);
+        const newProductsSearch = await getProducts(productIds);
 
         listProducts.forEach((item) => {
           const { node } = item;
@@ -186,9 +273,7 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
   };
 
   const getShoppingListDetails = async (params: SearchProps) => {
-    const shoppingListDetailInfo = isB2BUser
-      ? await getB2BShoppingListDetails({ id, ...params })
-      : await getBcShoppingListDetails({ id, ...params });
+    const shoppingListDetailInfo = await getShoppingList(params);
 
     const {
       products: { edges, totalCount },
@@ -218,7 +303,7 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
     setIsRequestLoading(true);
     try {
       const params: UpdateShoppingListParamsProps = {
-        id: +id,
+        id: Number(id),
         name: shoppingListInfo?.name || '',
         description: shoppingListInfo?.description || '',
       };
@@ -255,14 +340,10 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
 
   const handleDeleteItems = async (itemId: number | string = '') => {
     setIsRequestLoading(true);
-    const deleteShoppingListItem = isB2BUser ? deleteB2BShoppingListItem : deleteBcShoppingListItem;
 
     try {
       if (itemId) {
-        await deleteShoppingListItem({
-          itemId,
-          shoppingListId: id,
-        });
+        await deleteShoppingListItem(itemId);
 
         if (checkedArr.length > 0) {
           const newCheckedArr = checkedArr.filter((item: ListItemProps) => {
@@ -278,10 +359,7 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
         checkedArr.forEach(async (item: ListItemProps) => {
           const { node } = item;
 
-          await deleteShoppingListItem({
-            itemId: node.itemId,
-            shoppingListId: id,
-          });
+          await deleteShoppingListItem(node.itemId);
         });
 
         setCheckedArr([]);
@@ -294,28 +372,8 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
     }
   };
 
-  useEffect(() => {
-    if (checkedArr.length > 0) {
-      let total = 0.0;
-
-      checkedArr.forEach((item: ListItemProps) => {
-        const {
-          node: { quantity, basePrice, taxPrice },
-        } = item;
-
-        const price = getBCPrice(+basePrice, +taxPrice);
-
-        total += price * +quantity;
-      });
-
-      setSelectedSubTotal((1000 * total) / 1000);
-    } else {
-      setSelectedSubTotal(0.0);
-    }
-  }, [checkedArr]);
-
   const handleDeleteProductClick = async () => {
-    await handleDeleteItems(+deleteItemId);
+    await handleDeleteItems(Number(deleteItemId));
     await handleCancelClick();
   };
 
@@ -334,26 +392,17 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
 
   useEffect(() => {
     if (isB2BUser && shoppingListInfo) {
-      const editShoppingListPermission = permissions.find(
-        (item) => item.code === 'deplicate_shopping_list',
-      );
-      const param: PermissionLevelInfoProps[] = [];
+      const { companyInfo, customerInfo } = shoppingListInfo;
 
-      if (editShoppingListPermission && !isEmpty(editShoppingListPermission)) {
-        const currentLevel = editShoppingListPermission.permissionLevel;
-        const isOwner = shoppingListInfo?.isOwner || false;
-        param.push({
-          permissionType: 'shoppingListActionsPermission',
-          permissionLevel: currentLevel === 1 && isOwner ? currentLevel : 2,
-        });
-      }
-
-      const { shoppingListActionsPermission } = getB3PermissionsList(param);
+      const { shoppingListCreateActionsPermission } = b2bPermissionsMap;
+      const shoppingListActionsPermission = verifyLevelPermission({
+        code: shoppingListCreateActionsPermission,
+        companyId: Number(companyInfo?.companyId || 0),
+        userId: Number(customerInfo?.userId || 0),
+      });
 
       setIsCanEditShoppingList(shoppingListActionsPermission);
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shoppingListInfo, isB2BUser]);
 
   return (
@@ -468,7 +517,7 @@ function ShoppingListDetails({ setOpenPage }: PageProps) {
               shoppingListInfo={shoppingListInfo}
               allowJuniorPlaceOrder={allowJuniorPlaceOrder}
               checkedArr={checkedArr}
-              selectedSubTotal={selectedSubTotal}
+              selectedSubTotal={calculateSubTotal(checkedArr)}
               setLoading={setIsRequestLoading}
               setDeleteOpen={setDeleteOpen}
               setValidateFailureProducts={setValidateFailureProducts}

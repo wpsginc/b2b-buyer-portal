@@ -1,80 +1,41 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { B2BEvent, useB2BCallback } from '@b3/hooks';
+import { dispatchEvent } from '@b3/hooks';
 import { useB3Lang } from '@b3/lang';
 import { Alert, Box, ImageListItem } from '@mui/material';
 
 import { B3Card } from '@/components';
 import B3Spin from '@/components/spin/B3Spin';
-import { CHECKOUT_URL } from '@/constants';
+import { CHECKOUT_URL, PATH_ROUTES } from '@/constants';
 import { useMobile } from '@/hooks';
 import { CustomStyleContext } from '@/shared/customStyleButton';
 import { defaultCreateAccountPanel } from '@/shared/customStyleButton/context/config';
-import { GlobaledContext } from '@/shared/global';
-import { getBCForcePasswordReset, superAdminEndMasquerade } from '@/shared/service/b2b';
-import { b2bLogin, bcLogoutLogin, customerLoginAPI } from '@/shared/service/bc';
-import { deleteCart, getCart } from '@/shared/service/bc/graphql/cart';
-import {
-  clearMasqueradeCompany,
-  isLoggedInSelector,
-  useAppDispatch,
-  useAppSelector,
-} from '@/store';
+import { GlobalContext } from '@/shared/global';
+import { getBCForcePasswordReset } from '@/shared/service/b2b';
+import { b2bLogin, bcLogin, customerLoginAPI } from '@/shared/service/bc';
+import { isLoggedInSelector, useAppDispatch, useAppSelector } from '@/store';
 import { setB2BToken } from '@/store/slices/company';
 import { CustomerRole, UserTypes } from '@/types';
-import { channelId, getB3PermissionsList, loginJump, snackbar, storeHash } from '@/utils';
+import { LoginFlagType } from '@/types/login';
+import { b2bJumpPath, channelId, loginJump, platform, snackbar, storeHash } from '@/utils';
 import b2bLogger from '@/utils/b3Logger';
-import { logoutSession } from '@/utils/b3logout';
-import { deleteCartData } from '@/utils/cartUtils';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
 
 import { type PageProps } from '../PageProps';
 
 import LoginWidget from './component/LoginWidget';
-import { loginCheckout, LoginConfig } from './config';
+import { CatalystLogin } from './CatalystLogin';
+import { isLoginFlagType, loginCheckout, LoginConfig, loginType } from './config';
 import LoginExistingUser from './LoginExistingUser';
 import LoginForm from './LoginForm';
 import LoginPanel from './LoginPanel';
 import { LoginContainer, LoginImage } from './styled';
+import { useLogout } from './useLogout';
 
-type AlertColor = 'success' | 'info' | 'warning' | 'error';
-
-const useMasquerade = () => {
-  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
-  const salesRepCompanyId = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.id);
-  const storeDispatch = useAppDispatch();
-
-  const endMasquerade = useCallback(async () => {
-    if (isAgenting) {
-      await superAdminEndMasquerade(+salesRepCompanyId);
-      storeDispatch(clearMasqueradeCompany());
-    }
-  }, [salesRepCompanyId, storeDispatch, isAgenting]);
-
-  return { endMasquerade, isAgenting };
-};
-
-const setTipType = (flag: string): AlertColor | undefined => {
-  if (!flag) {
-    return undefined;
-  }
-
-  switch (flag) {
-    case '1':
-      return 'error';
-    case '4':
-      return 'error';
-    case '5':
-      return 'warning';
-    default:
-      return 'success';
-  }
-};
-
-export default function Login(props: PageProps) {
-  const { isAgenting, endMasquerade } = useMasquerade();
+function Login(props: PageProps) {
   const { setOpenPage } = props;
   const storeDispatch = useAppDispatch();
+  const logout = useLogout();
 
   const isLoggedIn = useAppSelector(isLoggedInSelector);
 
@@ -86,7 +47,7 @@ export default function Login(props: PageProps) {
   const [isMobile] = useMobile();
 
   const [showTipInfo, setShowTipInfo] = useState<boolean>(true);
-  const [flag, setLoginFlag] = useState<string>('');
+  const [flag, setLoginFlag] = useState<LoginFlagType>();
   const [loginAccount, setLoginAccount] = useState<LoginConfig>({
     emailAddress: '',
     password: '',
@@ -97,7 +58,7 @@ export default function Login(props: PageProps) {
 
   const {
     state: { isCheckout, logo, registerEnabled },
-  } = useContext(GlobaledContext);
+  } = useContext(GlobalContext);
 
   const {
     state: {
@@ -131,225 +92,168 @@ export default function Login(props: PageProps) {
   };
 
   useEffect(() => {
-    const logout = async () => {
+    (async () => {
       try {
         const loginFlag = searchParams.get('loginFlag');
         const showTipInfo = searchParams.get('showTip') !== 'false';
 
         setShowTipInfo(showTipInfo);
 
-        if (loginFlag) setLoginFlag(loginFlag);
-
-        if (loginFlag === '7') {
-          snackbar.error(b3Lang('login.loginText.invoiceErrorTip'));
+        if (isLoginFlagType(loginFlag)) {
+          setLoginFlag(loginFlag);
         }
-        if (loginFlag === '3' && isLoggedIn) {
-          try {
-            const cartInfo = await getCart();
 
-            if (cartInfo.data.site.cart?.entityId) {
-              const deleteQuery = deleteCartData(cartInfo.data.site.cart.entityId);
-              await deleteCart(deleteQuery);
-            }
-
-            const { result } = (await bcLogoutLogin()).data.logout;
-
-            if (result !== 'success') return;
-
-            if (isAgenting) {
-              await endMasquerade();
-            }
-          } catch (e) {
-            b2bLogger.error(e);
-          } finally {
-            // SUP-1282 Clear sessionStorage to allow visitors to display the checkout page
-            window.sessionStorage.clear();
-            logoutSession();
-            window.b2b.callbacks.dispatchEvent(B2BEvent.OnLogout);
-            setLoading(false);
-          }
-
-          const { result } = (await bcLogoutLogin()).data.logout;
-
-          if (result !== 'success') return;
-
-          if (isAgenting) {
-            await endMasquerade();
-          }
-
-          // SUP-1282 Clear sessionStorage to allow visitors to display the checkout page
-          window.sessionStorage.clear();
-
-          logoutSession();
-          setLoading(false);
-          return;
+        if (loginFlag === 'invoiceErrorTip') {
+          const { tip } = loginType[loginFlag];
+          snackbar.error(b3Lang(tip));
         }
+
+        if (loginFlag === 'loggedOutLogin' && isLoggedIn) {
+          await logout();
+        }
+
         setLoading(false);
       } finally {
         setLoading(false);
       }
+    })();
+  }, [b3Lang, isLoggedIn, logout, searchParams]);
+
+  const tipInfo = (loginFlag: LoginFlagType, email = '') => {
+    const { tip, alertType } = loginType[loginFlag];
+
+    return {
+      message: b3Lang(tip, { email }),
+      severity: alertType,
     };
-
-    logout();
-  }, [b3Lang, endMasquerade, isLoggedIn, isAgenting, searchParams]);
-
-  const tipInfo = (loginFlag: string, email = '') => {
-    if (!loginFlag) {
-      return '';
-    }
-
-    switch (loginFlag) {
-      case '1':
-        return b3Lang('login.loginTipInfo.resetPassword', {
-          email,
-        });
-      case '2':
-        return b3Lang('login.loginTipInfo.receivePassword');
-      case '3':
-        return b3Lang('login.loginTipInfo.loggedOutLogin');
-      case '4':
-        return b3Lang('login.loginTipInfo.accountincorrect');
-      case '5':
-        return b3Lang('login.loginTipInfo.accountPrelaunch');
-      case '6':
-        return b3Lang('login.loginText.deviceCrowdingLogIn');
-      default:
-        return '';
-    }
   };
 
   const getForcePasswordReset = async (email: string) => {
     const forcePasswordReset = await getBCForcePasswordReset(email);
 
     if (forcePasswordReset) {
-      setLoginFlag('1');
+      setLoginFlag('resetPassword');
     } else {
-      setLoginFlag('4');
+      setLoginFlag('accountIncorrect');
     }
   };
 
-  const handleLoginSubmit = useB2BCallback(
-    B2BEvent.OnLogin,
-    async (dispatchOnLoginEvent, data: LoginConfig) => {
-      setLoading(true);
-      setLoginAccount(data);
-      setSearchParams((prevURLSearchParams) => {
-        prevURLSearchParams.delete('loginFlag');
-        return prevURLSearchParams;
-      });
+  const forcePasswordReset = async (email: string, password: string) => {
+    const { errors: bcErrors } = await bcLogin({
+      email,
+      pass: password,
+    });
 
-      if (isCheckout) {
-        try {
-          const response = await loginCheckout(data);
+    if (bcErrors?.[0]) {
+      const { message } = bcErrors[0];
 
-          if (response.status === 400 && response.type === 'reset_password_before_login') {
-            b2bLogger.error(response);
-            await data.emailAddress;
-          } else {
-            window.location.href = CHECKOUT_URL;
-          }
-        } catch (error) {
-          b2bLogger.error(error);
-          await getForcePasswordReset(data.emailAddress);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        try {
-          const loginData = {
-            email: data.emailAddress,
-            password: data.password,
-            storeHash,
-            channelId,
-          };
-          const {
-            login: {
-              result: { token, storefrontLoginToken },
-              errors,
-            },
-          } = await b2bLogin({ loginData });
-
-          storeDispatch(setB2BToken(token));
-          customerLoginAPI(storefrontLoginToken);
-
-          const loginInformation = {
-            storefrontToken: storefrontLoginToken,
-          };
-
-          dispatchOnLoginEvent(loginInformation);
-
-          if (errors?.[0] || !token) {
-            if (errors?.[0]) {
-              const { message } = errors[0];
-              if (
-                message === 'Operation cannot be performed as the storefront channel is not live'
-              ) {
-                setLoginFlag('5');
-                setLoading(false);
-                return;
-              }
-            }
-            getForcePasswordReset(data.emailAddress);
-          } else {
-            const info = await getCurrentCustomerInfo(token);
-
-            if (quoteDetailToCheckoutUrl) {
-              navigate(quoteDetailToCheckoutUrl);
-              return;
-            }
-
-            if (
-              info?.userType === UserTypes.MULTIPLE_B2C &&
-              info?.role === CustomerRole.SUPER_ADMIN
-            ) {
-              navigate('/dashboard');
-              return;
-            }
-            const isLoginLandLocation = loginJump(navigate);
-
-            if (!isLoginLandLocation) return;
-
-            const { getShoppingListPermission, getOrderPermission } = getB3PermissionsList();
-            if (
-              info?.role === CustomerRole.JUNIOR_BUYER &&
-              info?.companyRoleName === 'Junior Buyer'
-            ) {
-              const currentJuniorActivePage = getShoppingListPermission
-                ? '/shoppingLists'
-                : '/accountSettings';
-
-              navigate(currentJuniorActivePage);
-            } else {
-              let currentActivePage = getOrderPermission ? '/orders' : '/shoppingLists';
-
-              currentActivePage =
-                getShoppingListPermission || getOrderPermission
-                  ? currentActivePage
-                  : '/accountSettings';
-
-              currentActivePage = info?.userType === UserTypes.B2C ? '/orders' : currentActivePage;
-              navigate(currentActivePage);
-            }
-          }
-        } catch (error) {
-          snackbar.error(b3Lang('login.loginTipInfo.accountincorrect'));
-        } finally {
-          setLoading(false);
-        }
+      if (message === 'Reset password') {
+        getForcePasswordReset(email);
+        return true;
       }
-    },
-  );
+    }
 
-  const handleCreateAccountSubmit = () => {
-    navigate('/register');
+    return false;
   };
 
-  const gotoForgotPassword = () => {
-    navigate('/forgotpassword');
+  const handleLoginSubmit = async (data: LoginConfig) => {
+    setLoading(true);
+    setLoginAccount(data);
+    setSearchParams((prevURLSearchParams) => {
+      prevURLSearchParams.delete('loginFlag');
+      return prevURLSearchParams;
+    });
+
+    if (isCheckout) {
+      try {
+        const response = await loginCheckout(data);
+
+        if (response.status === 400 && response.type === 'reset_password_before_login') {
+          setLoginFlag('resetPassword');
+        } else if (response.type === 'invalid_login') {
+          setLoginFlag('accountIncorrect');
+        } else {
+          window.location.href = CHECKOUT_URL;
+        }
+      } catch (error) {
+        b2bLogger.error(error);
+        await getForcePasswordReset(data.emailAddress);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      try {
+        const loginData = {
+          email: data.emailAddress,
+          password: data.password,
+          storeHash,
+          channelId,
+        };
+
+        const isForcePasswordReset = await forcePasswordReset(data.emailAddress, data.password);
+        if (isForcePasswordReset) return;
+
+        const {
+          login: {
+            result: { token, storefrontLoginToken },
+            errors,
+          },
+        } = await b2bLogin({ loginData });
+
+        storeDispatch(setB2BToken(token));
+        customerLoginAPI(storefrontLoginToken);
+
+        dispatchEvent('on-login', { storefrontToken: storefrontLoginToken });
+
+        if (errors?.[0] || !token) {
+          if (errors?.[0]) {
+            const { message } = errors[0];
+            if (message === 'Operation cannot be performed as the storefront channel is not live') {
+              setLoginFlag('accountPrelaunch');
+              setLoading(false);
+              return;
+            }
+          }
+          getForcePasswordReset(data.emailAddress);
+        } else {
+          const info = await getCurrentCustomerInfo(token);
+
+          if (quoteDetailToCheckoutUrl) {
+            navigate(quoteDetailToCheckoutUrl);
+            return;
+          }
+
+          if (
+            info?.userType === UserTypes.MULTIPLE_B2C &&
+            info?.role === CustomerRole.SUPER_ADMIN
+          ) {
+            navigate('/dashboard');
+            return;
+          }
+          const isLoginLandLocation = loginJump(navigate);
+
+          if (!isLoginLandLocation) return;
+
+          if (info?.userType === UserTypes.B2C) {
+            navigate(PATH_ROUTES.ORDERS);
+          }
+
+          const path = b2bJumpPath(Number(info?.role));
+
+          navigate(path);
+        }
+      } catch (error) {
+        snackbar.error(b3Lang('login.loginTipInfo.accountIncorrect'));
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   const loginAndRegisterContainerWidth = registerEnabled ? '100%' : '50%';
   const loginContainerWidth = registerEnabled ? '50%' : 'auto';
+
+  const tip = flag && tipInfo(flag, loginAccount?.emailAddress);
 
   return (
     <B3Card setOpenPage={setOpenPage}>
@@ -373,9 +277,9 @@ export default function Login(props: PageProps) {
                       margin: '30px 0 0 0',
                     }}
                   >
-                    {tipInfo(flag, loginAccount?.emailAddress) && (
-                      <Alert severity={setTipType(flag)} variant="filled">
-                        {tipInfo(flag, loginAccount?.emailAddress || '')}
+                    {tip && (
+                      <Alert severity={tip.severity} variant="filled">
+                        {tip.message}
                       </Alert>
                     )}
                   </Box>
@@ -454,7 +358,6 @@ export default function Login(props: PageProps) {
                       >
                         <LoginForm
                           loginBtn={loginInfo.loginBtn}
-                          gotoForgotPassword={gotoForgotPassword}
                           handleLoginSubmit={handleLoginSubmit}
                           backgroundColor={backgroundColor}
                         />
@@ -470,7 +373,6 @@ export default function Login(props: PageProps) {
                           <LoginPanel
                             createAccountButtonText={loginInfo.createAccountButtonText}
                             widgetBodyText={loginInfo.widgetBodyText}
-                            handleSubmit={handleCreateAccountSubmit}
                           />
                         </Box>
                       )}
@@ -493,4 +395,12 @@ export default function Login(props: PageProps) {
       </LoginContainer>
     </B3Card>
   );
+}
+
+export default function LoginPage(props: PageProps) {
+  if (platform === 'catalyst') {
+    return <CatalystLogin />;
+  }
+
+  return <Login {...props} />;
 }

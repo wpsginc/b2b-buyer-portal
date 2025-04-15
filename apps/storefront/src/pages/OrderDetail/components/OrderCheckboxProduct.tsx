@@ -60,8 +60,8 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
   const itemStyle = isMobile ? mobileItemStyle : defaultItemStyle;
 
   const handleSelectAllChange = () => {
-    const newlist = [...list];
-    if (newlist.length === products.length) {
+    const newList = [...list];
+    if (newList.length === products.length) {
       setList([]);
       setReturnList([]);
     } else {
@@ -70,7 +70,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
       products.forEach((item, index) => {
         returnIds[index] = {
           returnId: item.id,
-          returnQty: +item.editQuantity,
+          returnQty: Number(item.editQuantity),
         };
       });
 
@@ -80,21 +80,21 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
   };
 
   const handleSelectChange = (variantId: number, returnId: number, returnQty: number) => {
-    const newlist = [...list];
+    const newList = [...list];
     const newReturnList = [...returnList];
-    const index = newlist.findIndex((item) => item === variantId);
+    const index = newList.findIndex((item) => item === variantId);
     const returnIndex = newReturnList.findIndex((item) => item.returnId === returnId);
     if (index !== -1) {
-      newlist.splice(index, 1);
+      newList.splice(index, 1);
       newReturnList.splice(returnIndex, 1);
     } else {
-      newlist.push(variantId);
+      newList.push(variantId);
       newReturnList.push({
         returnId,
         returnQty,
       });
     }
-    setList(newlist);
+    setList(newList);
     setReturnList(newReturnList);
   };
 
@@ -104,10 +104,10 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
     (product: EditableProductItem) => (e: ChangeEvent<HTMLInputElement>) => {
       const element = product;
       const valueNum = e.target.value;
-      if (+valueNum >= 0 && +valueNum <= 1000000) {
+      if (Number(valueNum) >= 0 && Number(valueNum) <= 1000000) {
         element.editQuantity = valueNum;
         if (type === 'return') {
-          if (+valueNum > +product.quantity) {
+          if (Number(valueNum) > Number(product.quantity)) {
             element.editQuantity = product.quantity;
             snackbar.error(
               b3Lang('purchasedProducts.error.returnedQuantityShouldBeWithinThePurchase'),
@@ -116,7 +116,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
             returnList.forEach((listItem) => {
               const item = listItem;
               if (item.returnId === product.id) {
-                item.returnQty = +valueNum;
+                item.returnQty = Number(valueNum);
               }
             });
             setReturnArr(returnList);
@@ -134,7 +134,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
 
   const handleNumberInputBlur = (product: EditableProductItem) => () => {
     const editableProduct = product;
-    if (!product.editQuantity || +product.editQuantity === 0) {
+    if (!product.editQuantity || Number(product.editQuantity) === 0) {
       editableProduct.editQuantity = '1';
       onProductChange([...products]);
     }
@@ -189,7 +189,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
           <Checkbox
             checked={isChecked(product.variant_id)}
             onChange={() =>
-              handleSelectChange(product.variant_id, product.id, +product.editQuantity)
+              handleSelectChange(product.variant_id, product.id, Number(product.editQuantity))
             }
           />
           <FlexItem>
@@ -214,7 +214,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
           </FlexItem>
           <FlexItem textAlignLocation={textAlign} padding="10px 0 0" {...itemStyle.default}>
             {isMobile && <span>{b3Lang('orderDetail.reorder.price')} </span>}
-            {`${currencyFormat(product.base_price)}`}
+            {currencyFormat(product.base_price)}
           </FlexItem>
           <FlexItem textAlignLocation={textAlign} {...itemStyle.default}>
             <TextField
@@ -240,7 +240,7 @@ export default function OrderCheckboxProduct(props: OrderCheckboxProductProps) {
           </FlexItem>
           <FlexItem textAlignLocation={textAlign} padding="10px 0 0" {...itemStyle.default}>
             {isMobile && <span>{b3Lang('orderDetail.reorder.total')} </span>}
-            {`${currencyFormat(getProductTotals(getProductQuantity(product), product.base_price))}`}
+            {currencyFormat(getProductTotals(getProductQuantity(product), product.base_price))}
           </FlexItem>
         </Flex>
       ))}

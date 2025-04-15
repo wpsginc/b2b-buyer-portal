@@ -5,7 +5,6 @@ interface OpenPageByClickProps {
   role: number | string;
   isRegisterAndLogin: boolean;
   isAgenting: boolean;
-  IsRealJuniorBuyer: boolean;
   authorizedPages: string;
 }
 
@@ -51,8 +50,6 @@ const redirectBcMenus = (
   // Supermarket theme
   if (key.includes('/account.php') && !key.includes('?')) {
     switch (role) {
-      case CustomerRole.JUNIOR_BUYER:
-        return authorizedPages;
       case CustomerRole.SUPER_ADMIN:
         return '/dashboard';
       default:
@@ -67,13 +64,16 @@ const redirectBcMenus = (
     accountTarget.find((item) => key?.includes(item.originUrl)) || {};
 
   // super admin
-  if (currentItem?.newTargetUrl && +role === CustomerRole.SUPER_ADMIN) {
+  if (currentItem?.newTargetUrl && Number(role) === CustomerRole.SUPER_ADMIN) {
     return superAdminExistUrl.includes(currentItem.newTargetUrl) || isAgenting
       ? currentItem.newTargetUrl
       : '/dashboard';
   }
 
-  if (+role === CustomerRole.JUNIOR_BUYER && currentItem?.newTargetUrl?.includes('order_status')) {
+  if (
+    (Number(role) === CustomerRole.JUNIOR_BUYER || Number(role) === CustomerRole.CUSTOM_ROLE) &&
+    currentItem?.newTargetUrl?.includes('order_status')
+  ) {
     return authorizedPages;
   }
 
@@ -87,7 +87,7 @@ const redirectBcMenus = (
 const getCurrentLoginUrl = (href: string): string => {
   // quit login
   if (href?.includes('logout')) {
-    return '/login?loginFlag=3';
+    return '/login?loginFlag=loggedOutLogin';
   }
 
   if (href?.includes('create_account')) {
@@ -99,14 +99,11 @@ const getCurrentLoginUrl = (href: string): string => {
 
 const openPageByClick = ({
   href,
-  role,
+  role: currentRole,
   isRegisterAndLogin,
   isAgenting,
-  IsRealJuniorBuyer,
   authorizedPages,
 }: OpenPageByClickProps) => {
-  const currentRole = !IsRealJuniorBuyer && +role === CustomerRole.JUNIOR_BUYER ? 1 : role;
-
   if (href?.includes('register')) {
     return '/register';
   }
@@ -115,7 +112,7 @@ const openPageByClick = ({
   }
 
   if (
-    +currentRole === CustomerRole.JUNIOR_BUYER &&
+    Number(currentRole) === CustomerRole.JUNIOR_BUYER &&
     (href?.includes('/orders') ||
       href?.includes('/shoppingLists') ||
       href?.includes('/login') ||
@@ -130,7 +127,7 @@ const openPageByClick = ({
   }
 
   // other click
-  return redirectBcMenus(href, +currentRole, isAgenting, authorizedPages);
+  return redirectBcMenus(href, Number(currentRole), isAgenting, authorizedPages);
 };
 
 export { getCurrentLoginUrl, openPageByClick, redirectBcMenus, removeBCMenus };

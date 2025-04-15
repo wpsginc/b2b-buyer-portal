@@ -14,7 +14,7 @@ import { format, formatDistanceStrict } from 'date-fns';
 
 import { B3CollapseContainer } from '@/components';
 import B3Spin from '@/components/spin/B3Spin';
-import { GlobaledContext } from '@/shared/global';
+import { GlobalContext } from '@/shared/global';
 import { updateB2BQuote, updateBCQuote } from '@/shared/service/b2b';
 import { rolePermissionSelector, useAppSelector } from '@/store';
 import { displayExtendedFormat, storeHash } from '@/utils';
@@ -50,7 +50,7 @@ function ChatMessage({ msg, isEndMessage, isCustomer }: CustomerMessageProps) {
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        alignItems: `${isCustomer ? 'flex-end' : 'flex-start'}`,
+        alignItems: isCustomer ? 'flex-end' : 'flex-start',
         paddingTop: '5px',
       }}
     >
@@ -74,7 +74,7 @@ function ChatMessage({ msg, isEndMessage, isCustomer }: CustomerMessageProps) {
             display: 'inline-block',
             lineHeight: '34px',
             padding: '0 10px',
-            background: `${isCustomer ? 'rgba(25, 118, 210, 0.3)' : 'rgba(0, 0, 0, 0.12)'}`,
+            background: isCustomer ? 'rgba(25, 118, 210, 0.3)' : 'rgba(0, 0, 0, 0.12)',
             borderRadius: '18px',
             m: '1px',
           }}
@@ -134,7 +134,7 @@ function DateMessage({ msg }: DateMessageProps) {
 }
 
 function Message({ msgs, id, isB2BUser, email, status }: MsgsProps) {
-  const { dispatch: globalDispatch } = useContext(GlobaledContext);
+  const { dispatch: globalDispatch } = useContext(GlobalContext);
 
   const theme = useTheme();
   const primaryColor = theme.palette.primary.main;
@@ -149,11 +149,10 @@ function Message({ msgs, id, isB2BUser, email, status }: MsgsProps) {
 
   const [message, setMessage] = useState<string>('');
 
-  const [loadding, setLoadding] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const { quotesActionsPermission: quotesActionsPermissionRename } =
-    useAppSelector(rolePermissionSelector);
-  const quotesActionsPermission = isB2BUser ? quotesActionsPermissionRename : true;
+  const { quotesUpdateMessageActionsPermission } = useAppSelector(rolePermissionSelector);
+  const quotesUpdateMessagePermission = isB2BUser ? quotesUpdateMessageActionsPermission : true;
 
   const convertedMsgs = (msgs: MessageProps[]) => {
     let nextMsg: MessageProps = {};
@@ -262,13 +261,13 @@ function Message({ msgs, id, isB2BUser, email, status }: MsgsProps) {
   const updateMsgs = async (msg: string) => {
     try {
       const fn = isB2BUser ? updateB2BQuote : updateBCQuote;
-      setLoadding(true);
+      setLoading(true);
       const {
         quoteUpdate: {
           quote: { trackingHistory },
         },
       } = await fn({
-        id: +id,
+        id: Number(id),
         quoteData: {
           message: msg,
           lastMessage: parseInt(`${new Date().getTime() / 1000}`, 10),
@@ -280,7 +279,7 @@ function Message({ msgs, id, isB2BUser, email, status }: MsgsProps) {
       setRead(0);
       convertedMsgs(trackingHistory);
     } finally {
-      setLoadding(false);
+      setLoading(false);
     }
   };
 
@@ -293,11 +292,11 @@ function Message({ msgs, id, isB2BUser, email, status }: MsgsProps) {
   const handleOnChange = useCallback(
     (open: boolean) => {
       if (open) {
-        if (!quotesActionsPermission && isB2BUser) return;
+        if (!quotesUpdateMessagePermission && isB2BUser) return;
         const fn = isB2BUser ? updateB2BQuote : updateBCQuote;
         if (changeReadRef.current === 0 && msgs.length) {
           fn({
-            id: +id,
+            id: Number(id),
             quoteData: {
               lastMessage: msgs[msgs.length - 1]?.date,
               userEmail: email || '',
@@ -312,7 +311,7 @@ function Message({ msgs, id, isB2BUser, email, status }: MsgsProps) {
         changeReadRef.current += 1;
       }
     },
-    [email, id, isB2BUser, msgs, quotesActionsPermission],
+    [email, id, isB2BUser, msgs, quotesUpdateMessagePermission],
   );
 
   useEffect(() => {
@@ -375,9 +374,9 @@ function Message({ msgs, id, isB2BUser, email, status }: MsgsProps) {
             </Box>
           </Box>
 
-          {status !== 4 && quotesActionsPermission && (
+          {status !== 4 && quotesUpdateMessagePermission && (
             <B3Spin
-              isSpinning={loadding}
+              isSpinning={loading}
               spinningHeight={50}
               size={10}
               isCloseLoading
@@ -397,7 +396,7 @@ function Message({ msgs, id, isB2BUser, email, status }: MsgsProps) {
                       color: 'rgba(0, 0, 0, 0.38)',
                     },
                     '& input': {
-                      padding: '1.5rem 0 0.5rem 0',
+                      padding: '1.5rem 0.7rem 0.5rem',
                     },
                   }}
                   value={message}
