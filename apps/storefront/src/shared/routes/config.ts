@@ -32,8 +32,11 @@ const legacyPermissions = {
   invoicePermissions: [
     CustomerRole.ADMIN,
     CustomerRole.SENIOR_BUYER,
+    CustomerRole.JUNIOR_BUYER,
     CustomerRole.SUPER_ADMIN,
     CustomerRole.CUSTOM_ROLE,
+    CustomerRole.B2C,
+    CustomerRole.GUEST,
   ],
   quotesPermissions: [
     CustomerRole.SUPER_ADMIN,
